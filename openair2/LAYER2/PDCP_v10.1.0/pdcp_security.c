@@ -218,7 +218,15 @@ pdcp_validate_security(
       decrypt_params.message    = pdcp_pdu_buffer;
       decrypt_params.blength    = sdu_buffer_size << 3;
       decrypt_params.key        = pdcp_pP->kRRCint + 16;// 128;
-
+      int len = 22;
+      int i = 0;
+      LOG_D(PDCP,"sdu_buffer_size (%d):\n", sdu_buffer_size);
+      LOG_D(PDCP,"Dump (%d):\n", len);
+      for (i = 0; i < len; i++){
+        //if ((i % 16) == 0)
+          //LOG_D(PDCP, "\n");
+        LOG_D(PDCP,"i: %d %.2x \n", i, pdcp_pdu_buffer[i]);
+      }
       if (stream_check_integrity(pdcp_pP->integrityProtAlgorithm,
                                  &decrypt_params,
                                  &pdcp_pdu_buffer[sdu_buffer_size]) != 0) {
