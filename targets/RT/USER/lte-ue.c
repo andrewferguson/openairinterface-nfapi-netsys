@@ -1159,6 +1159,12 @@ static void *UE_phy_stub_standalone_pnf_task(void *arg) {
           LOG_E(PHY, "[UE %" PRIu8 "] Frame %" PRIu32 ", subframe %u %s\n",
                 UE->Mod_id, rx_frame, NFAPI_SFNSF2SF(sfn_sf), get_connectionloss_errstr(ret));
         }
+        //Alex
+        if (ret == PHY_HO_PRACH) {
+          LOG_D(PHY, "We have to do the PRACH reconfig parameters\n");
+          UE_mac_inst[ue_Mod_id].SI_Decoded = 1;
+          next_ra_frame = 500;
+        }
       }
 
 #if UE_TIMING_TRACE
@@ -1180,10 +1186,15 @@ static void *UE_phy_stub_standalone_pnf_task(void *arg) {
         if (UE_mac_inst[ue_Mod_id].UE_mode[0] == PRACH) {
           //&& ue_Mod_id == next_Mod_id) {
           next_ra_frame++;
+          LOG_D(MAC, "UE_mode 2: %d next_ra_frame %d\n", UE_mac_inst[ue_Mod_id].UE_mode[0], next_ra_frame);
 
           if (next_ra_frame > 500) {
             // check if we have PRACH opportunity
+            LOG_D(MAC, "we are outside is_prach_subframe UE_mac_inst[ue_Mod_id].SI_Decoded %d \n", UE_mac_inst[ue_Mod_id].SI_Decoded);
+
             if (is_prach_subframe(&UE->frame_parms, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf)) && UE_mac_inst[ue_Mod_id].SI_Decoded == 1) {
+                LOG_D(MAC, "we are in is_prach_subframe \n");
+
               // The one working strangely...
               //if (is_prach_subframe(&UE->frame_parms,NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf) && Mod_id == (module_id_t) init_ra_UE) ) {
               UL_INFO->rach_ind.header.phy_id = UE->frame_parms.Nid_cell;
