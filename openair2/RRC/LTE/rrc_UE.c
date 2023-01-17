@@ -97,7 +97,9 @@ static int from_nr_ue_fd = -1;
 static int to_nr_ue_fd = -1;
 int slrb_id;
 int send_ue_information = 0;
-
+int current_enb = 0;
+int counter = 0;
+uint8_t target_eNB_index=0xFF;
 // for malloc_clear
 #include "PHY/defs_UE.h"
 
@@ -2292,9 +2294,10 @@ rrc_ue_decode_dcch(
   LTE_DL_DCCH_Message_t *dl_dcch_msg=NULL;//&dldcchmsg;
   //  asn_dec_rval_t dec_rval;
   // int i;
-  uint8_t target_eNB_index=0xFF;
+
   MessageDef *msg_p;
 
+  LOG_I(RRC, "Alex inside rrc_ue_decode_dcch\n");
   if (Srb_id != 1) {
     LOG_E(RRC,"[UE %d] Frame %d: Received message on DL-DCCH (SRB%ld), should not have ...\n",
           ctxt_pP->module_id, ctxt_pP->frame, Srb_id);
@@ -2319,7 +2322,7 @@ rrc_ue_decode_dcch(
   }
 
   if (dl_dcch_msg->message.present == LTE_DL_DCCH_MessageType_PR_c1) {
-    if (UE_rrc_inst[ctxt_pP->module_id].Info[eNB_indexP].State >= RRC_CONNECTED) {
+    if (UE_rrc_inst[ctxt_pP->module_id].Info[current_enb].State >= RRC_CONNECTED) {
       switch (dl_dcch_msg->message.choice.c1.present) {
         case LTE_DL_DCCH_MessageType__c1_PR_NOTHING:
           LOG_I(RRC, "[UE %d] Frame %d : Received PR_NOTHING on DL-DCCH-Message\n",
@@ -2403,10 +2406,12 @@ rrc_ue_decode_dcch(
               target_eNB_index,
               dl_dcch_msg->message.choice.c1.choice.rrcConnectionReconfiguration.rrc_TransactionIdentifier,
               NULL);
-            UE_rrc_inst[ctxt_pP->module_id].Info[eNB_indexP].State = RRC_HO_EXECUTION;
+            UE_rrc_inst[ctxt_pP->module_id].Info[current_enb].State = RRC_HO_EXECUTION;
             UE_rrc_inst[ctxt_pP->module_id].Info[target_eNB_index].State = RRC_RECONFIGURED;
-            LOG_I(RRC, "[UE %d] State = RRC_RECONFIGURED during HO (eNB %d)\n",
-                  ctxt_pP->module_id, target_eNB_index);
+
+            LOG_I(RRC, "[UE %d] State = RRC_RECONFIGURED during HO (eNB %d), current_enb %d\n",
+                  ctxt_pP->module_id, target_eNB_index, current_enb);
+
 #if ENABLE_RAL
             {
               MessageDef                                 *message_ral_p = NULL;
@@ -4473,7 +4478,7 @@ void rrc_ue_generate_MeasurementReport(protocol_ctxt_t *const ctxt_pP, uint8_t e
   static frame_t   pframe=0;
   nElem = 98;
   nElem1 = 35;
-  target_eNB_offset = UE_rrc_inst[ctxt_pP->module_id].Info[0].handoverTarget; // eNB_offset of target eNB: used to obtain the mod_id of target eNB
+  target_eNB_offset = UE_rrc_inst[ctxt_pP->module_id].Info[eNB_index].handoverTarget; // eNB_offset of target eNB: used to obtain the mod_id of target eNB
 
   for (int i = 0; i < MAX_MEAS_ID; i++) {
     if (UE_rrc_inst[ctxt_pP->module_id].measReportList[0][i] != NULL) {
@@ -4618,15 +4623,16 @@ void ue_measurement_report_triggering(protocol_ctxt_t *const ctxt_pP, const uint
                 case LTE_ReportConfigEUTRA__triggerType__event__eventId_PR_eventA3:
                   LOG_D(RRC,"[UE %d] Frame %d : A3 event: check if a neighboring cell becomes offset better than serving to trigger a measurement event \n",
                         ctxt_pP->module_id, ctxt_pP->frame);
-
+                  LOG_D(RRC,"Alex: ue->Info[0].State %d, ue->Info[1].State %d current_enb %d, ue->HandoverInfoUe.measFlag %d, ue->Info[current_enb].T304_active %d, counter %d \n", ue->Info[0].State, ue->Info[1].State,current_enb, ue->HandoverInfoUe.measFlag, ue->Info[current_enb].T304_active, counter);
                   if ((check_trigger_meas_event(
                          ctxt_pP->module_id,
                          ctxt_pP->frame,
-                         eNB_index,
+                         current_enb,
                          i,j,ofn,ocn,hys,ofs,ocs,a3_offset,ttt_ms)) &&
-                      (ue->Info[0].State >= RRC_CONNECTED) &&
-                      (ue->Info[0].T304_active == 0 )      &&
-                      (ue->HandoverInfoUe.measFlag == 1)) {
+                      (ue->Info[current_enb].State >= RRC_CONNECTED) &&
+                      (ue->Info[current_enb].T304_active == 0 )      &&
+                      (ue->HandoverInfoUe.measFlag == 1)              &&
+                      counter > 5000) {
                     //trigger measurement reporting procedure (36.331, section 5.5.5)
                     if (ue->measReportList[i][j] == NULL) {
                       ue->measReportList[i][j] = malloc(sizeof(MEAS_REPORT_LIST));
@@ -4636,7 +4642,7 @@ void ue_measurement_report_triggering(protocol_ctxt_t *const ctxt_pP, const uint
                     ue->measReportList[i][j]->numberOfReportsSent = 0;
                     rrc_ue_generate_MeasurementReport(
                       ctxt_pP,
-                      eNB_index);
+                      current_enb);
                     ue->HandoverInfoUe.measFlag = 1;
                   } else {
                     if(ue->measReportList[i][j] != NULL) {
@@ -4751,21 +4757,21 @@ uint8_t check_trigger_meas_event(
       if(UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_offset]+ofn+ocn-hys > UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_index]+ofs+ocs-1/*+a3_offset*/) {
         UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset] += 2; //Called every subframe = 2ms
         LOG_D(RRC,"[UE %d] Frame %d: Entry measTimer[%d][%d][%d]: %d currentCell: %d betterCell: %d \n",
-              ue_mod_idP, frameP, ue_cnx_index,meas_index,tmp_offset,UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset],0,eNB_offset);
+              ue_mod_idP, frameP, ue_cnx_index,meas_index,tmp_offset,UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset],eNB_index,eNB_offset);
       } else {
         UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset] = 0; //Exit condition: Resetting the measurement timer
         LOG_D(RRC,"[UE %d] Frame %d: Exit measTimer[%d][%d][%d]: %d currentCell: %d betterCell: %d \n",
-              ue_mod_idP, frameP, ue_cnx_index,meas_index,tmp_offset,UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset],0,eNB_offset);
+              ue_mod_idP, frameP, ue_cnx_index,meas_index,tmp_offset,UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset],eNB_index,eNB_offset);
       }
 
       if (UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset] >= ttt) {
-        UE_rrc_inst->HandoverInfoUe.targetCellId = get_adjacent_cell_id(ue_mod_idP,tmp_offset); //WARNING!!!...check this!
+        UE_rrc_inst->HandoverInfoUe.targetCellId = eNB_offset; //WARNING!!!...check this!
         LOG_D(RRC,"[UE %d] Frame %d eNB %d: Handover triggered: targetCellId: %ld currentCellId: %d eNB_offset: %d rsrp source: %3.1f rsrp target: %3.1f\n",
               ue_mod_idP, frameP, eNB_index,
               UE_rrc_inst->HandoverInfoUe.targetCellId,ue_cnx_index,eNB_offset,
               get_RSRP(ue_mod_idP,0,0),
               get_RSRP(ue_mod_idP,0,1));
-        UE_rrc_inst->Info[0].handoverTarget = eNB_offset;
+        UE_rrc_inst->Info[eNB_index].handoverTarget = eNB_offset;
         //LOG_D(RRC,"PHY_ID: %d \n",UE_rrc_inst->HandoverInfoUe.targetCellId);
         return 1;
       }
@@ -5069,7 +5075,7 @@ void *rrc_ue_task( void *args_p ) {
               RRC_DCCH_DATA_IND (msg_p).frame,
               RRC_DCCH_DATA_IND (msg_p).dcch_index,
               RRC_DCCH_DATA_IND (msg_p).eNB_index);
-        LOG_D(RRC, PROTOCOL_RRC_CTXT_UE_FMT"Received %s DCCH %d, eNB %d\n",
+        LOG_D(RRC, PROTOCOL_RRC_CTXT_UE_FMT"Alex Received %s DCCH %d, eNB %d\n",
               PROTOCOL_RRC_CTXT_UE_ARGS(&ctxt),
               ITTI_MSG_NAME (msg_p),
               RRC_DCCH_DATA_IND (msg_p).dcch_index,
@@ -6529,7 +6535,7 @@ rrc_rx_tx_ue(
     if (UE_rrc_inst[ctxt_pP->module_id].Info[enb_indexP].T304_cnt == 0) {
       UE_rrc_inst[ctxt_pP->module_id].Info[enb_indexP].T304_active = 0;
       if (UE_rrc_inst[ctxt_pP->module_id].Info[enb_indexP].State == RRC_IDLE) {
-        UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.measFlag = 0;
+        //Alex UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.measFlag = 0;
         return (RRC_OK);
       }
       else {
@@ -6549,16 +6555,20 @@ rrc_rx_tx_ue(
   if (UE_rrc_inst[ctxt_pP->module_id].QuantityConfig[0] != NULL) {
     ue_meas_filtering(ctxt_pP,enb_indexP);
   }
-
+  counter = counter + 1;
+  //if (counter > 1000)
   ue_measurement_report_triggering(ctxt_pP,enb_indexP);
 
   if (UE_rrc_inst[ctxt_pP->module_id].Info[0].handoverTarget > 0) {
     LOG_I(RRC,"[UE %d] Frame %d : RRC handover initiated\n", ctxt_pP->module_id, ctxt_pP->frame);
   }
-
-  if((UE_rrc_inst[ctxt_pP->module_id].Info[enb_indexP].State == RRC_HO_EXECUTION)   &&
+  LOG_I(RRC,"Alex we are to get inside the if the if current_enb %d, target_eNB_index %d\n", current_enb, target_eNB_index);
+  if((UE_rrc_inst[ctxt_pP->module_id].Info[current_enb].State == RRC_HO_EXECUTION)   &&
       (UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.targetCellId != 0xFF)) {
-    UE_rrc_inst[ctxt_pP->module_id].Info[enb_indexP].State= RRC_IDLE;
+    LOG_I(RRC,"Alex we are in the if current_enb %d, target_eNB_index %d\n", current_enb, target_eNB_index);
+    UE_rrc_inst[ctxt_pP->module_id].Info[current_enb].State= RRC_IDLE;
+    current_enb = target_eNB_index;
+    counter = 0;
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_RX_TX,VCD_FUNCTION_OUT);
     return(RRC_HO_STARTED);
   }
