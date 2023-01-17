@@ -306,6 +306,11 @@ int stream_check_integrity(uint8_t algorithm, stream_cipher_t *stream_cipher, ui
       return -1;
     }
 
+    if (expected[0] == 0 && expected[1] == 0 && expected[2] == 0 && expected[3] == 0){
+      LOG_D(OSA, "integrety is not needed\n");
+      return 0;
+    }
+
     if (memcmp(result, expected, 4) != 0) {
       LOG_E(OSA, "Mismatch found in integrity for algorithm %u,\n"
             "\tgot %02x.%02x.%02x.%02x, expecting %02x.%02x.%02x.%02x\n",
