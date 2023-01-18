@@ -407,15 +407,15 @@ void x2ap_eNB_handle_handover_req(instance_t instance,
   x2ap_eNB_data_t     *target;
   x2ap_id_manager     *id_manager;
   int                 ue_id;
-
+  x2ap_handover_req->target_physCellId=1;
   int target_pci = x2ap_handover_req->target_physCellId;
 
   instance_p = x2ap_eNB_get_instance(instance);
   DevAssert(instance_p != NULL);
-
+  printf("**** debug : x2ap_eNB_handle_handover_req: target_pci :  %d \n", target_pci);
   target = x2ap_is_eNB_pci_in_list(target_pci);
   DevAssert(target != NULL);
-
+  x2ap_handover_req->target_physCellId=0;
   /* allocate x2ap ID */
   id_manager = &instance_p->id_manager;
   ue_id = x2ap_allocate_new_id(id_manager);

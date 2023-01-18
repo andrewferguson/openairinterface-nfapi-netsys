@@ -129,8 +129,8 @@ struct x2ap_eNB_data_s *x2ap_get_eNB(x2ap_eNB_instance_t *instance_p,
   struct x2ap_eNB_data_s  temp;
   struct x2ap_eNB_data_s *found;
 
-//printf("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
-//dump_trees();
+printf("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
+dump_trees();
 
   memset(&temp, 0, sizeof(struct x2ap_eNB_data_s));
 
@@ -209,10 +209,12 @@ x2ap_eNB_data_t  * x2ap_is_eNB_pci_in_list (const uint32_t pci)
 {
   x2ap_eNB_instance_t    *inst;
   struct x2ap_eNB_data_s *elm;
-
+  printf("Printing before crash : \n" );
+  dump_trees();
   STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
     RB_FOREACH(elm, x2ap_enb_map, &inst->x2ap_enb_head) {
       for (int i = 0; i<elm->num_cc; i++) {
+        printf("checking pci %d against %d \n",elm->Nid_cell[i], pci);
         if (elm->Nid_cell[i] == pci) {
           return elm;
         }
