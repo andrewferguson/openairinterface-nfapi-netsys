@@ -2369,6 +2369,8 @@ rrc_ue_decode_dcch(
           // first check if mobilityControlInfo  is present
           if (dl_dcch_msg->message.choice.c1.choice.rrcConnectionReconfiguration.criticalExtensions.choice.c1.choice.rrcConnectionReconfiguration_r8.mobilityControlInfo
               != NULL) {
+            LOG_W(RRC,"*** Ujjwal Hack \n ");
+            dl_dcch_msg->message.choice.c1.choice.rrcConnectionReconfiguration.criticalExtensions.choice.c1.choice.rrcConnectionReconfiguration_r8.mobilityControlInfo->targetPhysCellId =  UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.targetCellId ;
             /* 36.331, 5.3.5.4 Reception of an RRCConnectionReconfiguration including the mobilityControlInfo by the UE (handover)*/
             if (UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.targetCellId
                 != dl_dcch_msg->message.choice.c1.choice.rrcConnectionReconfiguration.criticalExtensions.choice.c1.choice.rrcConnectionReconfiguration_r8.mobilityControlInfo->targetPhysCellId) {
