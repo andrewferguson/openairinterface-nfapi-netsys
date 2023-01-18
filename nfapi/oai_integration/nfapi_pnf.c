@@ -62,6 +62,9 @@
 #include <targets/RT/USER/lte-softmodem.h>
 #include "nfapi/open-nFAPI/pnf/inc/pnf_p7.h"
 
+#include "openair2/ENB_APP/enb_id_global.h"
+extern int enb_id_global;
+
 #define NUM_P5_PHY 2
 
 #define _GNU_SOURCE
@@ -2283,13 +2286,13 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot) {
 }
 
 int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind) {
-  rach_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  rach_ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   LOG_D(PHY, "%s() sfn_sf:%d preambles:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(rach_ind->sfn_sf), rach_ind->rach_indication_body.number_of_preambles);
   return nfapi_pnf_p7_rach_ind(p7_config_g, rach_ind);
 }
 
 int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind) {
-  harq_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  harq_ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   harq_ind->header.message_id = NFAPI_HARQ_INDICATION;
   LOG_D(PHY, "%s() sfn_sf:%d number_of_harqs:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(harq_ind->sfn_sf), harq_ind->harq_indication_body.number_of_harqs);
   int retval = nfapi_pnf_p7_harq_ind(p7_config_g, harq_ind);
@@ -2301,21 +2304,21 @@ int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind) {
 }
 
 int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) {
-  crc_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  crc_ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   crc_ind->header.message_id = NFAPI_CRC_INDICATION;
   //LOG_D(PHY, "%s() sfn_sf:%d number_of_crcs:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(crc_ind->sfn_sf), crc_ind->crc_indication_body.number_of_crcs);
   return nfapi_pnf_p7_crc_ind(p7_config_g, crc_ind);
 }
 
 int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_RX_CQI_INDICATION;
   //LOG_D(PHY, "%s() sfn_sf:%d number_of_cqis:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->cqi_indication_body.number_of_cqis);
   return nfapi_pnf_p7_cqi_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_RX_ULSCH_INDICATION;
   int retval = nfapi_pnf_p7_rx_ind(p7_config_g, ind);
   //LOG_D(PHY,"%s() SFN/SF:%d pdus:%d retval:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->rx_indication_body.number_of_pdus, retval);
@@ -2324,7 +2327,7 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) {
 }
 
 int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   int retval = nfapi_pnf_p7_sr_ind(p7_config_g, ind);
   //LOG_D(PHY,"%s() SFN/SF:%d srs:%d retval:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->sr_indication_body.number_of_srs, retval);
   //free(ind.rx_indication_body.rx_pdu_list);
@@ -2334,37 +2337,37 @@ int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind) {
 //NR UPLINK INDICATION
 
 int oai_nfapi_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind) {
-  ind->header.phy_id = 1;
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION;
   return nfapi_pnf_p7_nr_slot_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION;
   return nfapi_pnf_p7_nr_rx_data_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION;
   return nfapi_pnf_p7_nr_crc_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION;
   return nfapi_pnf_p7_nr_srs_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION;
   return nfapi_pnf_p7_nr_uci_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = enb_id_global; // HACK TODO FIXME
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION;
   return nfapi_pnf_p7_nr_rach_ind(p7_config_g, ind);
 }
