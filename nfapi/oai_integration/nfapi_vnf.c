@@ -46,7 +46,6 @@
 #include "openair2/PHY_INTERFACE/queue_t.h"
 #include "gnb_ind_vars.h"
 
-#include "openair2/ENB_APP/enb_id_global.h"
 extern int enb_id_global;
 
 #define TEST

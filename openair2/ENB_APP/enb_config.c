@@ -58,7 +58,6 @@
 #include "executables/thread-common.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
 
-#include "enb_id_global.h"
 extern int enb_id_global;
 
 extern uint32_t to_earfcn_DL(int eutra_bandP, uint32_t dl_CarrierFreq, uint32_t bw);
