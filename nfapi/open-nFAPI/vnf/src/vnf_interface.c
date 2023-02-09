@@ -31,7 +31,6 @@
 
 #include "vnf.h"
 
-#include "openair2/ENB_APP/enb_id_global.h"
 extern int enb_id_global;
 
 nfapi_vnf_config_t* nfapi_vnf_config_create()

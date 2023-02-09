@@ -62,8 +62,7 @@
 #include <targets/RT/USER/lte-softmodem.h>
 #include "nfapi/open-nFAPI/pnf/inc/pnf_p7.h"
 
-#include "openair2/ENB_APP/enb_id_global.h"
-extern int enb_id_global;
+int enb_id_global = 0;  // DEFINITION HERE
 
 #define NUM_P5_PHY 2
 
