@@ -213,6 +213,7 @@ void ue_init_standalone_socket(int tx_port, int rx_port);
 void *ue_standalone_pnf_task(void *context);
 void send_standalone_msg(UL_IND_t *UL, nfapi_message_id_e msg_type);
 void send_standalone_dummy(void);
+void send_rnti_update(void);
 void enqueue_dl_config_req_tx_req(nfapi_dl_config_request_t *dl_config_req, nfapi_tx_request_t *tx_req);
 
 // Convert downlink nfapi messages to a string.

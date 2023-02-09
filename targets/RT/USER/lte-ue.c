@@ -1324,6 +1324,7 @@ static void *UE_phy_stub_standalone_pnf_task(void *arg) {
 
     if (!sent_any) {
       send_standalone_dummy();
+      //send_rnti_update();
     }
   }
 
