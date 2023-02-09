@@ -122,34 +122,76 @@ printf("---------------------------------------------\n");
 }
 }
 
+// struct x2ap_eNB_data_s *x2ap_get_eNB(x2ap_eNB_instance_t *instance_p,
+// 				     int32_t assoc_id,
+// 				     uint16_t cnx_id)
+// {
+//   struct x2ap_eNB_data_s  temp;
+//   struct x2ap_eNB_data_s *found;
+
+// //printf("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
+// //dump_trees();
+
+//   memset(&temp, 0, sizeof(struct x2ap_eNB_data_s));
+
+//   temp.assoc_id = assoc_id;
+//   temp.cnx_id   = cnx_id;
+
+//   if (instance_p == NULL) {
+//     STAILQ_FOREACH(instance_p, &x2ap_eNB_internal_data.x2ap_eNB_instances_head,
+//                    x2ap_eNB_entries) {
+//       found = RB_FIND(x2ap_enb_map, &instance_p->x2ap_enb_head, &temp);
+
+//       if (found != NULL) {
+//         return found;
+//       }
+//     }
+//   } else {
+//     return RB_FIND(x2ap_enb_map, &instance_p->x2ap_enb_head, &temp);
+//   }
+
+//   return NULL;
+// }
+
+
 struct x2ap_eNB_data_s *x2ap_get_eNB(x2ap_eNB_instance_t *instance_p,
 				     int32_t assoc_id,
 				     uint16_t cnx_id)
 {
-  struct x2ap_eNB_data_s  temp;
-  struct x2ap_eNB_data_s *found;
+  X2AP_DEBUG("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
+  dump_trees();
+  x2ap_eNB_instance_t    *inst;
+  struct x2ap_eNB_data_s *elm;
 
-//printf("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
-//dump_trees();
+  STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
+    RB_FOREACH(elm, x2ap_enb_map, &inst->x2ap_enb_head) {
 
-  memset(&temp, 0, sizeof(struct x2ap_eNB_data_s));
+        if (elm->cnx_id == cnx_id && elm->assoc_id==assoc_id) {
+          return elm;
+        }
 
-  temp.assoc_id = assoc_id;
-  temp.cnx_id   = cnx_id;
-
-  if (instance_p == NULL) {
-    STAILQ_FOREACH(instance_p, &x2ap_eNB_internal_data.x2ap_eNB_instances_head,
-                   x2ap_eNB_entries) {
-      found = RB_FIND(x2ap_enb_map, &instance_p->x2ap_enb_head, &temp);
-
-      if (found != NULL) {
-        return found;
-      }
     }
-  } else {
-    return RB_FIND(x2ap_enb_map, &instance_p->x2ap_enb_head, &temp);
   }
+  return NULL;
+}
 
+struct x2ap_eNB_data_s *x2ap_get_eNB_with_assoc_id(x2ap_eNB_instance_t *instance_p,
+				     int32_t assoc_id)
+{
+  //X2AP_DEBUG("x2ap_get_eNB at 1 (looking for assoc_id %d cnx_id %d)\n", assoc_id, cnx_id);
+  dump_trees();
+  x2ap_eNB_instance_t    *inst;
+  struct x2ap_eNB_data_s *elm;
+
+  STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
+    RB_FOREACH(elm, x2ap_enb_map, &inst->x2ap_enb_head) {
+
+        if (elm->assoc_id==assoc_id) {
+          return elm;
+        }
+
+    }
+  }
   return NULL;
 }
 
@@ -236,21 +278,35 @@ x2ap_eNB_data_t  * x2ap_is_eNB_id_in_list (const uint32_t eNB_id)
   return NULL;
 }
 
+// x2ap_eNB_data_t  * x2ap_is_eNB_assoc_id_in_list (const uint32_t sctp_assoc_id)
+// {
+//   x2ap_eNB_instance_t    *inst;
+//   struct x2ap_eNB_data_s *found;
+//   struct x2ap_eNB_data_s temp;
+
+//   temp.assoc_id = sctp_assoc_id;
+//   temp.cnx_id = -1;
+
+//   STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
+//     found = RB_FIND(x2ap_enb_map, &inst->x2ap_enb_head, &temp);
+//     if (found != NULL){
+//       if (found->assoc_id == sctp_assoc_id) {
+// 	return found;
+//       }
+//     }
+//   }
+//   return NULL;
+// }
+
 x2ap_eNB_data_t  * x2ap_is_eNB_assoc_id_in_list (const uint32_t sctp_assoc_id)
 {
   x2ap_eNB_instance_t    *inst;
-  struct x2ap_eNB_data_s *found;
-  struct x2ap_eNB_data_s temp;
-
-  temp.assoc_id = sctp_assoc_id;
-  temp.cnx_id = -1;
+  struct x2ap_eNB_data_s *elm;
 
   STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
-    found = RB_FIND(x2ap_enb_map, &inst->x2ap_enb_head, &temp);
-    if (found != NULL){
-      if (found->assoc_id == sctp_assoc_id) {
-	return found;
-      }
+    RB_FOREACH(elm, x2ap_enb_map, &inst->x2ap_enb_head) {
+      if (elm->assoc_id == sctp_assoc_id)
+        return elm;
     }
   }
   return NULL;

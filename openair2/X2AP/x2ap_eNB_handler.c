@@ -698,7 +698,7 @@ int x2ap_eNB_handle_x2_setup_response(instance_t instance,
     X2AP_ERROR("Received new x2 setup response on stream != 0\n");
   }
 
-  if ((x2ap_eNB_data = x2ap_get_eNB(NULL, assoc_id, 0)) == NULL) {
+  if ((x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id)) == NULL) {
     X2AP_ERROR("[SCTP %d] Received X2 setup response for non existing "
                "eNB context\n", assoc_id);
     return -1;
@@ -832,7 +832,7 @@ int x2ap_eNB_handle_x2_setup_failure(instance_t instance,
     assoc_id, stream);
   }
 
-  if ((x2ap_eNB_data = x2ap_get_eNB (NULL, assoc_id, 0)) == NULL) {
+  if ((x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id)) == NULL) {
     X2AP_ERROR("[SCTP %d] Received X2 setup failure for non existing "
     "eNB context\n", assoc_id);
     return -1;
@@ -904,7 +904,8 @@ int x2ap_eNB_handle_handover_preparation (instance_t instance,
 
   X2AP_DEBUG ("Received a new X2 handover request\n");
 
-  x2ap_eNB_data = x2ap_get_eNB(NULL, assoc_id, 0);
+
+  x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id);
   DevAssert(x2ap_eNB_data != NULL);
 
   instance_p = x2ap_eNB_get_instance(instance);
@@ -1051,7 +1052,7 @@ int x2ap_eNB_handle_handover_response (instance_t instance,
 
   X2AP_DEBUG ("Received a new X2 handover response\n");
 
-  x2ap_eNB_data = x2ap_get_eNB(NULL, assoc_id, 0);
+  x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id);
   DevAssert(x2ap_eNB_data != NULL);
 
   instance_p = x2ap_eNB_get_instance(instance);
@@ -1200,7 +1201,7 @@ int x2ap_eNB_handle_ue_context_release (instance_t instance,
 
   X2AP_DEBUG ("Received a new X2 ue context release\n");
 
-  x2ap_eNB_data = x2ap_get_eNB(NULL, assoc_id, 0);
+  x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id);
   DevAssert(x2ap_eNB_data != NULL);
 
   instance_p = x2ap_eNB_get_instance(instance);
@@ -1284,7 +1285,7 @@ int x2ap_eNB_handle_handover_cancel (instance_t instance,
 
   X2AP_DEBUG ("Received a new X2 handover cancel\n");
 
-  x2ap_eNB_data = x2ap_get_eNB(NULL, assoc_id, 0);
+  x2ap_eNB_data = x2ap_get_eNB_with_assoc_id(NULL, assoc_id);
   DevAssert(x2ap_eNB_data != NULL);
 
   instance_p = x2ap_eNB_get_instance(instance);
