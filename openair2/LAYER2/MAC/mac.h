@@ -1725,7 +1725,8 @@ typedef struct {
 
   eth_params_t         eth_params_n;
   LTE_PhysCellId_t     targetPhysCellId;
-
+  LTE_PhysCellId_t     sourcePhysCellId;
+  bool handover_info_send;
 } UE_MAC_INST;
 /*! \brief ID of the neighboring cells used for HO*/
 typedef struct {

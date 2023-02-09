@@ -2396,7 +2396,6 @@ rrc_ue_decode_dcch(
               UE_rrc_inst[ctxt_pP->module_id].HandoverInfoUe.measFlag = 1; // Ready to send more MeasReports if required
             }
           }
-
           rrc_ue_process_rrcConnectionReconfiguration(
             ctxt_pP,
             &dl_dcch_msg->message.choice.c1.choice.rrcConnectionReconfiguration,
@@ -4747,14 +4746,30 @@ uint8_t check_trigger_meas_event(
   LOG_D(RRC, "[UE %d] Frame %d: num_adj: %d eNB_idx: %d, NB_eNB_INST: %d\n",
         ue_mod_idP, frameP, get_n_adj_cells(ue_mod_idP,0), eNB_index, NB_eNB_INST);
 
-  for (eNB_offset = 0; eNB_offset<1+get_n_adj_cells(ue_mod_idP,0); eNB_offset++) {
+  // for (eNB_offset = 0; eNB_offset<1+get_n_adj_cells(ue_mod_idP,0); eNB_offset++) {
     /* RHS: Verify that idx 0 corresponds to currentCellIndex in rsrp array */
-    if((eNB_offset!=eNB_index)&&(eNB_offset<NB_eNB_INST)) {
-      if(eNB_offset<eNB_index) {
-        tmp_offset = eNB_offset;
-      } else {
-        tmp_offset = eNB_offset-1;
-      }
+    //ujjwal skipping varification
+    // if((eNB_offset!=eNB_index)&&(eNB_offset<NB_eNB_INST)) {
+    //   if(eNB_offset<eNB_index) {
+    //     tmp_offset = eNB_offset;
+    //   } else {
+    //     tmp_offset = eNB_offset-1;
+    //   }
+
+//[ujjwal] custom handover pattern
+      
+      if(eNB_index==0){
+        eNB_offset=2;
+        }
+      if(eNB_index==2){
+        eNB_offset=1;
+
+        }
+      if(eNB_index==1){
+        eNB_offset=0;
+        }
+        UE_rrc_inst->HandoverInfoUe.targetCellId=eNB_offset;
+      LOG_D(RRC,"Custom handover pattern is current : %d target : %d \n",eNB_index, eNB_offset);
 
       if(UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_offset]+ofn+ocn-hys > UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_index]+ofs+ocs-1/*+a3_offset*/) {
         UE_rrc_inst->measTimer[ue_cnx_index][meas_index][tmp_offset] += 2; //Called every subframe = 2ms
@@ -4781,8 +4796,8 @@ uint8_t check_trigger_meas_event(
       // else{
       //  LOG_D(RRC,"Condition does not hold\n");
       // }
-    }
-  }
+    // }
+  
 
   return 0;
 }

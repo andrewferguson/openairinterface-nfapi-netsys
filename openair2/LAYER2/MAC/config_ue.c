@@ -451,6 +451,8 @@ rrc_mac_config_req_ue(module_id_t Mod_idP,
     // store the previous rnti in case of failure, and set thenew rnti
     UE_mac_inst[Mod_idP].targetPhysCellId = mobilityControlInfo->targetPhysCellId;
     UE_mac_inst[Mod_idP].crnti_before_ho = UE_mac_inst[Mod_idP].crnti;
+    UE_mac_inst[Mod_idP].sourcePhysCellId = eNB_index;
+
     UE_mac_inst[Mod_idP].crnti =
       ((mobilityControlInfo->
         newUE_Identity.buf[1]) | (mobilityControlInfo->
@@ -473,6 +475,8 @@ rrc_mac_config_req_ue(module_id_t Mod_idP,
           UE_mac_inst[Mod_idP].crnti_before_ho,
           UE_mac_inst[Mod_idP].crnti,
           UE_mac_inst[Mod_idP].crnti);
+      
+    UE_mac_inst[Mod_idP].handover_info_send = 1;
     if (NFAPI_MODE != NFAPI_UE_STUB_PNF && NFAPI_MODE != NFAPI_MODE_STANDALONE_PNF)
       phy_config_afterHO_ue(Mod_idP, 0, eNB_index, mobilityControlInfo, 0);
     else

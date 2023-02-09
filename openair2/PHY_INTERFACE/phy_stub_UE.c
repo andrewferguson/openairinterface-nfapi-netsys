@@ -1686,6 +1686,32 @@ static void print_rx_ind(nfapi_rx_indication_t *p)
   fflush(stdout);
 }
 
+ void send_rnti_update(){
+
+      if(UE_mac_inst[0].handover_info_send != 0){
+      static uint16_t dummyrnti[4];
+
+      dummyrnti[0] = UE_mac_inst[0].crnti_before_ho;
+      dummyrnti[1] = UE_mac_inst[0].crnti_for_ho;
+      dummyrnti[2] = UE_mac_inst[0].targetPhysCellId;
+      if(dummyrnti[2]==2)
+      dummyrnti[3] = 1;
+      if(dummyrnti[2]==1)
+      dummyrnti[3] = 0;
+      if(dummyrnti[2]==0)
+      dummyrnti[3] = 2;
+      
+
+      if (send(ue_tx_sock_descriptor, dummyrnti, sizeof(dummyrnti), 0) < 0)
+      {
+        LOG_E(MAC, "send rnti update failed to OAI UE failed: %s\n", strerror(errno));
+        return;
+      }
+      UE_mac_inst[0].handover_info_send = 0;
+     }
+
+ }
+
   void send_standalone_msg(UL_IND_t *UL, nfapi_message_id_e msg_type)
   {
     int encoded_size = -1;
@@ -1694,6 +1720,8 @@ static void print_rx_ind(nfapi_rx_indication_t *p)
     switch (msg_type)
     {
     case NFAPI_RACH_INDICATION:
+      
+      send_rnti_update();
       encoded_size = nfapi_p7_message_pack(&UL->rach_ind, buffer, sizeof(buffer), NULL);
       LOG_A(MAC, "RACH_IND sent to Proxy, Size: %d Frame %d Subframe %d\n", encoded_size,
             NFAPI_SFNSF2SFN(UL->rach_ind.sfn_sf), NFAPI_SFNSF2SF(UL->rach_ind.sfn_sf));
@@ -1742,13 +1770,16 @@ static void print_rx_ind(nfapi_rx_indication_t *p)
 
   void send_standalone_dummy()
   {
+
     static const uint16_t dummy[] = {0, 0};
     if (send(ue_tx_sock_descriptor, dummy, sizeof(dummy), 0) < 0)
     {
       LOG_E(MAC, "send dummy to OAI UE failed: %s\n", strerror(errno));
       return;
     }
+
   }
+
 
 const char *dl_pdu_type_to_string(uint8_t pdu_type)
 {
