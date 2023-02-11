@@ -58,6 +58,8 @@
 #include "executables/thread-common.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
 
+extern int enb_id_global;
+
 extern uint32_t to_earfcn_DL(int eutra_bandP, uint32_t dl_CarrierFreq, uint32_t bw);
 extern uint32_t to_earfcn_UL(int eutra_bandP, uint32_t ul_CarrierFreq, uint32_t bw);
 extern char *parallel_config;
@@ -356,6 +358,7 @@ int RCconfig_RRC(uint32_t i, eNB_RRC_INST *rrc, int macrlc_has_f1) {
     } else {
       enb_id = *(ENBParamList.paramarray[i][ENB_ENB_ID_IDX].uptr);
     }
+    enb_id_global = enb_id;
 
     LOG_I(RRC,"Instance %d: Southbound Transport %s\n",i,*(ENBParamList.paramarray[i][ENB_TRANSPORT_S_PREFERENCE_IDX].strptr));
 

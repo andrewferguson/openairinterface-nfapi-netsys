@@ -107,6 +107,7 @@ void x2ap_eNB_handle_sctp_association_resp(instance_t instance, sctp_new_associa
   /* if the assoc_id is already known, it is certainly because an IND was received
    * before. In this case, just update streams and return
    */
+
   if (sctp_new_association_resp->assoc_id != -1) {
     x2ap_enb_data_p = x2ap_get_eNB(instance_p, sctp_new_association_resp->assoc_id,
                                    sctp_new_association_resp->ulp_cnx_id);
@@ -129,10 +130,9 @@ void x2ap_eNB_handle_sctp_association_resp(instance_t instance, sctp_new_associa
     }
   }
 
-  x2ap_enb_data_p = x2ap_get_eNB(instance_p, -1,
-                                 sctp_new_association_resp->ulp_cnx_id);
-  DevAssert(x2ap_enb_data_p != NULL);
-  dump_trees();
+ x2ap_enb_data_p = x2ap_get_eNB(instance_p, -1,sctp_new_association_resp->ulp_cnx_id);
+ DevAssert(x2ap_enb_data_p != NULL);
+ dump_trees();
 
   /* gNB: exit if connection to eNB failed - to be modified if needed.
    * We may want to try to connect over and over again until we succeed
@@ -455,7 +455,7 @@ void x2ap_eNB_handle_handover_req_ack(instance_t instance,
   instance_p = x2ap_eNB_get_instance(instance);
   DevAssert(instance_p != NULL);
 
-  target = x2ap_get_eNB(NULL, source_assoc_id, 0);
+  target = x2ap_get_eNB_with_assoc_id(NULL, source_assoc_id);
   DevAssert(target != NULL);
 
   /* rnti is a new information, save it */
@@ -584,7 +584,7 @@ void x2ap_eNB_ue_context_release(instance_t instance,
   instance_p = x2ap_eNB_get_instance(instance);
   DevAssert(instance_p != NULL);
 
-  target = x2ap_get_eNB(NULL, source_assoc_id, 0);
+  target = x2ap_get_eNB_with_assoc_id(NULL, source_assoc_id);
   DevAssert(target != NULL);
 
   x2ap_eNB_generate_x2_ue_context_release(instance_p, target, x2ap_ue_context_release);

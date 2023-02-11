@@ -31,7 +31,7 @@
 
 #include "vnf.h"
 
-
+extern int enb_id_global;
 
 nfapi_vnf_config_t* nfapi_vnf_config_create()
 {
@@ -1150,7 +1150,7 @@ int nfapi_vnf_allocate_phy(nfapi_vnf_config_t* config, int p5_idx, uint16_t* phy
 
 	nfapi_vnf_phy_info_t* info = (nfapi_vnf_phy_info_t*)calloc(1, sizeof(nfapi_vnf_phy_info_t));
 	info->p5_idx = p5_idx;
-	info->phy_id = vnf->next_phy_id++;
+	info->phy_id = enb_id_global; // HACK TODO FIXME: this won't work for multiple cc's in a single eNB
 
 	info->timing_window = 30;       // This seems to override what gets set by the user - why??? //TODO: Change in NR in terms of microsecends,what should be the value?
 	info->timing_info_mode = 0x03;

@@ -50,5 +50,6 @@ x2ap_eNB_data_t* x2ap_is_eNB_pci_in_list (const uint32_t pci);
 struct x2ap_eNB_data_s *x2ap_get_eNB(x2ap_eNB_instance_t *instance_p,
                                      int32_t assoc_id,
                                      uint16_t cnx_id);
-
+struct x2ap_eNB_data_s *x2ap_get_eNB_with_assoc_id(x2ap_eNB_instance_t *instance_p,
+				     int32_t assoc_id);
 #endif /* __X2AP_ENB_MANAGEMENT_PROCEDURES__H__ */
