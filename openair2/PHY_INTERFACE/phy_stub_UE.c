@@ -2043,14 +2043,17 @@ static int get_cqi_from_mcs(void)
 
       CHECK_INDEX(sf_rnti_mcs[sf].mcs, pdu_size);
       int mcs = get_mcs_from_sinr(sf_rnti_mcs[sf].sinr);
+      mcs=27;
       CHECK_INDEX(mcs_to_cqi, mcs);
       int cqi = mcs_to_cqi[mcs];
       LOG_I(MAC, "SINR: %f -> MCS: %d -> CQI: %d\n", sf_rnti_mcs[sf].sinr, mcs, cqi);
+      return 15;
       return cqi;
     }
     sf++;
   }
   LOG_E(MAC, "Unable to get CQI value because no MCS found\n");
+  return 15;
   abort();
 }
 
@@ -2075,6 +2078,7 @@ static void read_channel_param(const nfapi_dl_config_request_pdu_t * pdu, int sf
       CHECK_INDEX(sf_rnti_mcs[sf].drop_flag, index);
       sf_rnti_mcs[sf].rnti[index] = pdu->dci_dl_pdu.dci_dl_pdu_rel8.rnti;
       sf_rnti_mcs[sf].mcs[index] = pdu->dci_dl_pdu.dci_dl_pdu_rel8.mcs_1;
+      sf_rnti_mcs[sf].mcs[index] = 27;
       sf_rnti_mcs[sf].drop_flag[index] = false;
       sf_rnti_mcs[sf].pdu_size = index+1; //index starts at 0 so we incrament to get num of pdus
       sf_rnti_mcs[sf].latest = true;
