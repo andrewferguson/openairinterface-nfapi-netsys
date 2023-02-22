@@ -1205,8 +1205,17 @@ void UE_config_stub_pnf(void) {
   }
 }
 
+void send_discovery_packet_to_proxy(int sock, struct sockaddr_in pnf_addr)
+{
+  int addr_len = sizeof(pnf_addr);
+  uint16_t discovery = 0xFF00 | start_enb_id;
+  sendto(sock, &discovery, 2, 0, (struct sockaddr *)&pnf_addr, addr_len);
+  return;
+}
+
 void ue_init_standalone_socket(int tx_port, int rx_port)
 {
+  struct sockaddr_in pnf_addr;
   {
     struct sockaddr_in server_address;
     int addr_len = sizeof(server_address);
@@ -1237,6 +1246,10 @@ void ue_init_standalone_socket(int tx_port, int rx_port)
     }
     assert(ue_tx_sock_descriptor == -1);
     ue_tx_sock_descriptor = sd;
+
+    /* Store Proxy (PNF) address */
+    memcpy((uint8_t *) &pnf_addr, (uint8_t *) &server_address, addr_len);
+    pnf_addr.sin_port = htons(rx_port); /* We asume that the proxy uses the rx_port to send traffic to this UE (port rx_port) */
   }
 
   {
@@ -1262,6 +1275,9 @@ void ue_init_standalone_socket(int tx_port, int rx_port)
     }
     assert(ue_rx_sock_descriptor == -1);
     ue_rx_sock_descriptor = sd;
+
+    /* Send discovery packet to proxy from the rx socket */
+    send_discovery_packet_to_proxy(ue_rx_sock_descriptor, pnf_addr);
   }
 }
 

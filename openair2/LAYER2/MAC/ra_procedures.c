@@ -310,7 +310,7 @@ PRACH_RESOURCES_t *ue_get_rach(module_id_t module_idP, int CC_id,
               "Transmission on secondary CCs is not supported yet\n");
 
   if (UE_mode == PRACH) {
-    LOG_D(MAC, "ue_get_rach 3, RA_active value: %d", UE_mac_inst[module_idP].RA_active);
+    LOG_D(MAC, "ue_get_rach 3, RA_active value: %d\n", UE_mac_inst[module_idP].RA_active);
 
     if (UE_mac_inst[module_idP].radioResourceConfigCommon) {
       rach_ConfigCommon =
