@@ -80,7 +80,8 @@
 
 /* temporary compilation wokaround (UE/eNB split */
 
-
+uint8_t ue_id_kube;
+uint8_t start_enb_id;
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
@@ -532,6 +533,10 @@ int main( int argc, char **argv ) {
 
   int CC_id;
   uint8_t  abstraction_flag=0;
+
+  ue_id_kube = atoi(argv[argc-2]); // Add extra argument (ioulios)
+  start_enb_id = atoi(argv[argc-1]); // Add extra argument (ioulios)
+  printf("Ioulios: ue_id_kube %d, start_enb_id %d\n",ue_id_kube, start_enb_id);
   // Default value for the number of UEs. It will hold,
   // if not changed from the command line option --num-ues
   NB_UE_INST = 1;
@@ -539,7 +544,7 @@ int main( int argc, char **argv ) {
   NB_eNB_INST = 1;
   configmodule_interface_t *config_mod;
   start_background_system();
-  config_mod = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY);
+  config_mod = load_configmodule(argc - 2, argv, CONFIG_ENABLECMDLINEONLY);
 
   if (config_mod == NULL) {
     exit_fun("[SOFTMODEM] Error, configuration module init failed\n");
@@ -670,7 +675,7 @@ int main( int argc, char **argv ) {
       abort();
     }
     init_UE_stub_single_thread(NB_UE_INST,eMBMS_active,uecap_xer_in,emul_iface);
-    init_UE_standalone_thread(ue_id_g);
+    init_UE_standalone_thread(ue_id_kube);
   } else {
     init_UE(NB_UE_INST,eMBMS_active,uecap_xer_in,0,get_softmodem_params()->phy_test,UE_scan,UE_scan_carrier,mode,(int)rx_gain[0][0],tx_max_power[0],
             frame_parms[0]);
