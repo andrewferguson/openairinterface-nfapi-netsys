@@ -78,10 +78,12 @@
 #include "lte-softmodem.h"
 #include "executables/softmodem-common.h"
 
+#include "common/utils/lte/handover_controller.h"
 /* temporary compilation wokaround (UE/eNB split */
 
 uint8_t ue_id_kube;
 uint8_t start_enb_id;
+extern void parse_handovers(char * filename);
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
@@ -537,6 +539,7 @@ int main( int argc, char **argv ) {
   ue_id_kube = atoi(argv[argc-2]); // Add extra argument (ioulios)
   start_enb_id = atoi(argv[argc-1]); // Add extra argument (ioulios)
   printf("Ioulios: ue_id_kube %d, start_enb_id %d\n",ue_id_kube, start_enb_id);
+  parse_handovers("handover_table.csv");
   // Default value for the number of UEs. It will hold,
   // if not changed from the command line option --num-ues
   NB_UE_INST = 1;
@@ -684,7 +687,7 @@ int main( int argc, char **argv ) {
   if (get_softmodem_params()->phy_test==0) {
     printf("Filling UE band info\n");
     fill_ue_band_info();
-    dl_phy_sync_success (0, 0, 0, 1);
+    dl_phy_sync_success (0, 0, (unsigned char) start_enb_id, 1);
   }
 
   if (NFAPI_MODE != NFAPI_UE_STUB_PNF) {

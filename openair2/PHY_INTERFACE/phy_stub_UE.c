@@ -39,6 +39,7 @@
 #include "openair1/PHY/LTE_TRANSPORT/transport_common.h"
 #include "softmodem-common.h"
 
+extern uint8_t start_enb_id;
 extern int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind);
 void configure_nfapi_pnf(char *vnf_ip_addr,
                          int vnf_p5_port,

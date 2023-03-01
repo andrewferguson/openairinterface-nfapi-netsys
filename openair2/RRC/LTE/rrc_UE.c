@@ -89,6 +89,9 @@
 
 #include "LTE_SL-Preconfiguration-r12.h"
 
+#include "common/utils/lte/handover_controller.h"
+extern int get_target_eNB();
+
 //for D2D
 int ctrl_sock_fd;
 struct sockaddr_in prose_app_addr;
@@ -4632,8 +4635,9 @@ void ue_measurement_report_triggering(protocol_ctxt_t *const ctxt_pP, const uint
                          i,j,ofn,ocn,hys,ofs,ocs,a3_offset,ttt_ms)) &&
                       (ue->Info[current_enb].State >= RRC_CONNECTED) &&
                       (ue->Info[current_enb].T304_active == 0 )      &&
-                      (ue->HandoverInfoUe.measFlag == 1)              &&
-                      counter > 5000) {
+                      (ue->HandoverInfoUe.measFlag == 1) && counter > 5000
+                      ) {
+                        // && counter > 5000
                     //trigger measurement reporting procedure (36.331, section 5.5.5)
                     if (ue->measReportList[i][j] == NULL) {
                       ue->measReportList[i][j] = malloc(sizeof(MEAS_REPORT_LIST));
@@ -4758,17 +4762,20 @@ uint8_t check_trigger_meas_event(
 
 //[ujjwal] custom handover pattern
       
-      if(eNB_index==0){
-        eNB_offset=2;
-        }
-      if(eNB_index==2){
-        eNB_offset=1;
+      // if(eNB_index==0){
+      //   eNB_offset=2;
+      //   }
+      // if(eNB_index==2){
+      //   eNB_offset=1;
 
-        }
-      if(eNB_index==1){
-        eNB_offset=0;
-        }
-        UE_rrc_inst->HandoverInfoUe.targetCellId=eNB_offset;
+      //   }
+      // if(eNB_index==1){
+      //   eNB_offset=0;
+      //   }
+
+      eNB_offset = (uint8_t) get_target_eNB();
+      LOG_D(RRC,"Ioulios: Target eNB is now:%u \n",eNB_offset);
+      UE_rrc_inst->HandoverInfoUe.targetCellId=eNB_offset;
       LOG_D(RRC,"Custom handover pattern is current : %d target : %d \n",eNB_index, eNB_offset);
 
       if(UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_offset]+ofn+ocn-hys > UE_rrc_inst[ue_mod_idP].rsrp_db_filtered[eNB_index]+ofs+ocs-1/*+a3_offset*/) {

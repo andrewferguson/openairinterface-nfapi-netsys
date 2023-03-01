@@ -61,6 +61,7 @@
 #include "UTIL/OPT/opt.h"
 #include "lte-softmodem.h"
 #include "common/config/config_userapi.h"
+#include "common/utils/lte/handover_controller.h"
 #include "T.h"
 
 extern double cpuf;
@@ -86,6 +87,7 @@ extern void multicast_link_start(void (*rx_handlerP) (unsigned int, char *),
                                  char *multicast_ifname);
 extern int multicast_link_write_sock(int groupP, char *dataP, uint32_t sizeP);
 
+extern void update_target_eNB();
 
 int tx_req_num_elems;
 extern uint16_t sf_ahead;
@@ -1038,6 +1040,8 @@ static void *UE_phy_stub_standalone_pnf_task(void *arg) {
             sfn_sf >> 4, sfn_sf & 15);
       continue;
     }
+
+    update_target_eNB();
 
     last_sfn_sf = sfn_sf;
     nfapi_dl_config_req_tx_req_t *dl_config_req_tx_req = get_queue(&dl_config_req_tx_req_queue);
