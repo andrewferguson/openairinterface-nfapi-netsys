@@ -40,6 +40,7 @@
 #include "softmodem-common.h"
 
 extern uint8_t start_enb_id;
+extern int get_first_target();
 extern int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind);
 void configure_nfapi_pnf(char *vnf_ip_addr,
                          int vnf_p5_port,
@@ -1209,7 +1210,12 @@ void UE_config_stub_pnf(void) {
 void send_discovery_packet_to_proxy(int sock, struct sockaddr_in pnf_addr)
 {
   int addr_len = sizeof(pnf_addr);
-  uint16_t discovery = 0xFF00 | start_enb_id;
+  uint8_t target_eNB = (uint8_t) get_first_target(); 
+  //uint16_t discovery[] = 0x0000 | (start_enb_id << 4) | target_eNB;
+  uint8_t discovery[2];
+  discovery[0] = start_enb_id;
+  discovery[1] = target_eNB;
+  printf("Ioulios: start -> %d, target -> %d\n",start_enb_id, target_eNB);
   sendto(sock, &discovery, 2, 0, (struct sockaddr *)&pnf_addr, addr_len);
   return;
 }

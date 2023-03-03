@@ -14,7 +14,7 @@ long long get_time_s()
 
 void parse_handovers(char *filename)
 {
-  handover_count = 0;
+  target_eNB_count = 0;
   char line[256];
   FILE *fptr;
 
@@ -23,9 +23,25 @@ void parse_handovers(char *filename)
     return;
   }
 
+
+  for (char c = getc(fptr); c != EOF; c = getc(fptr))
+  {
+    if (c == '\n')
+    {
+      target_eNB_count = target_eNB_count + 1;
+    }
+  }
+  rewind(fptr);
+  printf("%d Lines found\n", target_eNB_count);
+
+  handovers = (int**) malloc(sizeof(int*) * target_eNB_count);
+    for (int i = 0; i < target_eNB_count; i++)
+    {
+      handovers[i] = (int*)malloc(2 * sizeof(int));
+    }
+        
   int enb_id, time_offset;
   int count = 0;
-
   while (fgets(line, sizeof(line), fptr)) {
     sscanf(line, "%d,%d", &enb_id, &time_offset);
 
@@ -33,9 +49,8 @@ void parse_handovers(char *filename)
     handovers[count][1] = time_offset;
     count++;
   }
-  handover_count = count;
-  printf("%d Handovers parsed\n", handover_count);
-  for (int i = 0; i < handover_count; i++)
+  printf("%d Lines parsed\n", count);
+  for (int i = 0; i < target_eNB_count; i++)
   {
     printf("%d,%d\n", handovers[i][0], handovers[i][1]);
   }
@@ -63,7 +78,7 @@ void update_target_eNB()
     return;
   }
 
-  for (int i = 0; i < handover_count; i++)
+  for (int i = 0; i < target_eNB_count; i++)
   {
     enb_id = handovers[i][0];
     time_offset = handovers[i][1];
@@ -77,8 +92,7 @@ void update_target_eNB()
     
     if (current_time - start_time < time_offset)
     {
-      printf("current_time - start_time\n", start_time, current_time, time_offset);
-      printf("start time: %ld, current time:%ld, offset: %d\n", start_time, current_time, time_offset);
+      printf("start time: %lld, current time:%lld, offset: %d\n", start_time, current_time, time_offset);
       fflush(stdout);
       continue; // change to break to if handovers are ordered by time
     } 
@@ -103,4 +117,14 @@ void update_target_eNB()
 int get_target_eNB()
 {
   return target_eNB;
+}
+
+int get_first_target()
+{
+  if (target_eNB_count > 1)
+  {
+    return handovers[1][0];
+  } else {
+    return handovers[0][0];
+  }
 }

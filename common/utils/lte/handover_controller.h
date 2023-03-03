@@ -10,8 +10,8 @@
 
 const float RSRP_GOOD_MEASUREMENT;
 
-int handovers[1024][2];
-int handover_count;
+int** handovers;
+int target_eNB_count;
 int target_eNB;
 extern long long start_time;
 
@@ -22,5 +22,7 @@ void parse_handovers(char * filename);
 void update_target_eNB();
 
 int get_target_eNB();
+
+int get_first_target();
 
 #endif /* HANDOVER_CONTROLLER_H*/
