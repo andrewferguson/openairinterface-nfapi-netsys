@@ -358,7 +358,7 @@ int RCconfig_RRC(uint32_t i, eNB_RRC_INST *rrc, int macrlc_has_f1) {
     } else {
       enb_id = *(ENBParamList.paramarray[i][ENB_ENB_ID_IDX].uptr);
     }
-    enb_id_global = enb_id;
+    enb_id_global = 1;
 
     LOG_I(RRC,"Instance %d: Southbound Transport %s\n",i,*(ENBParamList.paramarray[i][ENB_TRANSPORT_S_PREFERENCE_IDX].strptr));
 

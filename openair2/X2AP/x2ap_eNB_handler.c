@@ -1121,7 +1121,7 @@ int x2ap_eNB_handle_handover_response (instance_t instance,
 	e_RABs_Admitted_Item = &e_RABS_Admitted_ItemIEs->value.choice.E_RABs_Admitted_Item;
   
 	X2AP_HANDOVER_REQ_ACK(msg).e_rabs_tobesetup[i].e_rab_id = e_RABs_Admitted_Item->e_RAB_ID ;
-	X2AP_ERROR("x2u tunnel: index %d e_rab_id %d\n", i, X2AP_HANDOVER_REQ_ACK(msg).e_rabs_tobesetup[i].e_rab_id);
+	//X2AP_ERROR("x2u tunnel: index %d e_rab_id %d\n", i, X2AP_HANDOVER_REQ_ACK(msg).e_rabs_tobesetup[i].e_rab_id);
 		  
 	if(e_RABs_Admitted_Item->dL_GTP_TunnelEndpoint == NULL){
 	  X2AP_DEBUG("%s %d: X2AP_E_RABs_Admitted_Item_t->dL_GTP_TunnelEndpoint is a NULL pointer \n", __FILE__, __LINE__);
