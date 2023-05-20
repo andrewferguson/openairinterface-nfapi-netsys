@@ -5579,7 +5579,7 @@ rrc_eNB_generate_HO_RRCConnectionReconfiguration(const protocol_ctxt_t *const ct
     NULL,//SRB1_logicalChannelConfig,
     ue_context_pP->ue_context.measGapConfig,
     (LTE_TDD_Config_t *) NULL,
-    (LTE_MobilityControlInfo_t *) NULL,
+    (LTE_MobilityControlInfo_t *) ue_context_pP->ue_context.mobilityInfo,
     (LTE_SchedulingInfoList_t *) NULL,
     0,
     NULL,

@@ -1712,8 +1712,8 @@ int s1ap_eNB_handle_s1_path_switch_request_ack(uint32_t               assoc_id,
                       &S1AP_PATH_SWITCH_REQ_ACK(message_p).ue_ambr.br_dl);
   } else {
     S1AP_WARN("UEAggregateMaximumBitrate not supported\n");
-    S1AP_PATH_SWITCH_REQ_ACK(message_p).ue_ambr.br_ul = 0;
-    S1AP_PATH_SWITCH_REQ_ACK(message_p).ue_ambr.br_dl = 0;
+    S1AP_PATH_SWITCH_REQ_ACK(message_p).ue_ambr.br_ul = 1073741824;
+    S1AP_PATH_SWITCH_REQ_ACK(message_p).ue_ambr.br_dl = 1073741824;
   }
 
   /* optional */

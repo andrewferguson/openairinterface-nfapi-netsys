@@ -968,7 +968,8 @@ int x2ap_eNB_handle_handover_preparation (instance_t instance,
   X2AP_HANDOVER_REQ(msg).security_capabilities.integrity_algorithms =
     BIT_STRING_to_uint16(&ie->value.choice.UE_ContextInformation.uESecurityCapabilities.integrityProtectionAlgorithms);
 
-  //X2AP_HANDOVER_REQ(msg).ue_ambr=ue_context_pP->ue_context.ue_ambr;
+  X2AP_HANDOVER_REQ(msg).ue_ambr.br_dl=1073741824;
+  X2AP_HANDOVER_REQ(msg).ue_ambr.br_ul=1073741824;
 
   if ((ie->value.choice.UE_ContextInformation.aS_SecurityInformation.key_eNodeB_star.buf) &&
           (ie->value.choice.UE_ContextInformation.aS_SecurityInformation.key_eNodeB_star.size == 32)) {

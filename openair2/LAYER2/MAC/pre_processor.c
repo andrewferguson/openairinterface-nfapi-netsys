@@ -871,6 +871,7 @@ int rr_ul_run(module_id_t Mod_id,
         mac->HI_DCI0_req[CC_id][subframe].hi_dci0_request_body.number_of_dci--;
         continue;
       }
+
       LOG_D(MAC, "%4d.%d UE %d retx %d RBs at start %d\n",
             sched_frame,
             sched_subframe,
@@ -885,6 +886,8 @@ int rr_ul_run(module_id_t Mod_id,
     }
 
     const int B = cmax(UE_template->estimated_ul_buffer - UE_template->scheduled_ul_bytes, 0);
+    LOG_D(MAC, "estimated_ul_buffer : %d | scheduled_ul_bytes : %d \n",UE_template->estimated_ul_buffer, UE_template->scheduled_ul_bytes);
+
     const int UE_to_be_scheduled = UE_is_to_be_scheduled(Mod_id, CC_id, UE_id);
     if (B == 0 && !UE_to_be_scheduled)
       continue;
@@ -1044,6 +1047,7 @@ int rr_ul_run(module_id_t Mod_id,
 
   return rbs[0].length + (num_contig_rb > 1 ? rbs[1].length : 0);
 }
+
 default_sched_ul_algo_t round_robin_ul = {
   .name  = "round_robin_ul",
   .setup = rr_ul_setup,

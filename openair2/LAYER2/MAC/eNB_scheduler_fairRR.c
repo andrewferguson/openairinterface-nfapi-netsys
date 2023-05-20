@@ -2317,7 +2317,8 @@ void ulsch_scheduler_pre_ue_select_fairRR(
       }
     }
 
-    //
+    LOG_D(MAC, "estimated_ul_buffer : %d | scheduled_ul_bytes : %d \n", UE_info->UE_template[CC_id][UE_id].estimated_ul_buffer, UE_info->UE_template[CC_id][UE_id].scheduled_ul_bytes);
+
     int bytes_to_schedule = UE_info->UE_template[CC_id][UE_id].estimated_ul_buffer - UE_info->UE_template[CC_id][UE_id].scheduled_ul_bytes;
 
     if (bytes_to_schedule < 0) {
@@ -2632,6 +2633,7 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
       }
 
       total_rbs = N_RB_UL-num_pucch_rb-first_rb[CC_id];
+      LOG_D(MAC, "N_RB_UL : %d | num_pucch_rb : %d | first_rb[CC_id] %d | total_rbs : %d | ue_num_temp : %d\n ", N_RB_UL, num_pucch_rb, first_rb[CC_id], total_rbs,  ue_num_temp );
       average_rbs = (int)round((double)total_rbs/(double)ue_num_temp);
 
       if ( average_rbs < 3 ) {
@@ -2642,6 +2644,7 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
       }
 
       if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].ue_priority == SCH_UL_RETRANS ) {
+        LOG_D(MAC, "Going to if \n");
         if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].nb_rb <= average_rbs ) {
           // assigne RBS(nb_rb)
           ulsch_ue_select[CC_id].list[ulsch_ue_num].start_rb = first_rb[CC_id];
@@ -2653,7 +2656,8 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
             // assigne RBS(average_rbs)
             ulsch_ue_select[CC_id].list[ulsch_ue_num].start_rb = first_rb[CC_id];
             first_rb[CC_id] = first_rb[CC_id] + ulsch_ue_select[CC_id].list[ulsch_ue_num].nb_rb;
-          } else {
+          } 
+          else {
             // assigne RBS(remain rbs)
             ulsch_ue_select[CC_id].list[ulsch_ue_num].start_rb = first_rb[CC_id];
             rb_table_index = 2;
@@ -2663,10 +2667,13 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
             }
 
             ulsch_ue_select[CC_id].list[ulsch_ue_num].nb_rb = rb_table[rb_table_index-1];
+
             first_rb[CC_id] = first_rb[CC_id] + rb_table[rb_table_index-1];
           }
         }
-      } else {
+      } 
+      else {
+        LOG_D(MAC, "Going to else \n");
         UE_template = &UE_info->UE_template[CC_id][UE_id];
 
         int32_t framex10psubframe = UE_template->pusch_bler_calc_frame*10+UE_template->pusch_bler_calc_subframe;
@@ -2721,13 +2728,14 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
         }
 
         if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].ue_priority  == SCH_UL_FIRST ) {
+          LOG_D(MAC, "Going to SCH_UL_FIRST \n");
           int bytes_to_schedule = UE_template->estimated_ul_buffer - UE_template->scheduled_ul_bytes;
 
           if (bytes_to_schedule < 0) {
             bytes_to_schedule = 0;
             UE_template->scheduled_ul_bytes = 0;
           }
-
+          LOG_D(MAC, " ul_total_buffer : %d | bytes_to_schedule %d | UE_template->scheduled_ul_bytes %d \n", ulsch_ue_select[CC_id].list[ulsch_ue_num].ul_total_buffer, bytes_to_schedule, UE_template->scheduled_ul_bytes );
           if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].ul_total_buffer > 0 ) {
             rb_table_index = 2;
             tbs = get_TBS_UL(mcs,rb_table[rb_table_index]);
@@ -2771,27 +2779,31 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
               UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = rb_table[rb_table_index];
               UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = rb_table_index;
               UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = mcs;
+              
             }
-            LOG_D(MAC,"[eNB %hu] frame %u subframe %u, UE %d/%x CC %d snr %hhu snr_inst %hhu mcs %hhd mcs_offset %hhu bler %lf total_bler %lf ( %lu %lu ) rb_num %hhu phr_info %hhd tx_power %hd bsr %d estimated_ul_buffer %d scheduled_ul_bytes %d\n",
+             LOG_D(MAC,"[eNB %hu] frame %u subframe %u, UE %d/%x CC %d snr %hhu snr_inst %hhu mcs %hhd mcs_offset %hhu bler %lf total_bler %lf ( %lu %lu ) rb_num %hhu phr_info %hhd tx_power %hd bsr %d estimated_ul_buffer %d scheduled_ul_bytes %d rb_table[rb_table_index] : %d |  rb_table_index : %d | mcs : %d  \n",
                   module_idP,frameP,subframeP,UE_id,UE_RNTI(CC_id,UE_id),CC_id, snr, UE_info->UE_sched_ctrl[UE_id].pusch_snr[CC_id], mcs, UE_info->UE_sched_ctrl[UE_id].mcs_offset[CC_id], UE_info->UE_sched_ctrl[UE_id].pusch_bler[CC_id], 
-                  total_bler, UE_info->UE_sched_ctrl[UE_id].pusch_rx_num[CC_id], UE_info->UE_sched_ctrl[UE_id].pusch_rx_error_num[CC_id], rb_table[rb_table_index-1], UE_template->phr_info, tx_power, bytes_to_schedule, UE_template->estimated_ul_buffer, UE_template->scheduled_ul_bytes);
-            
+                  total_bler, UE_info->UE_sched_ctrl[UE_id].pusch_rx_num[CC_id], UE_info->UE_sched_ctrl[UE_id].pusch_rx_error_num[CC_id], rb_table[rb_table_index-1], UE_template->phr_info, tx_power, bytes_to_schedule, UE_template->estimated_ul_buffer, UE_template->scheduled_ul_bytes, rb_table[rb_table_index], rb_table_index, mcs);
+           
           } else {
             if (mac_eNB_get_rrc_status(module_idP,UE_RNTI(module_idP, UE_id)) < RRC_CONNECTED) {
               // assigne RBS( 6 RBs)
-              first_rb[CC_id] = first_rb[CC_id] + 6;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 6;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 5;
-              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 10;
+              first_rb[CC_id] = first_rb[CC_id] + 45;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 45;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 21;
+              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 20;
             } else {
               // assigne RBS( 5 RBs)
-              first_rb[CC_id] = first_rb[CC_id] + 5;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 5;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 4;
-              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 10; 
+              first_rb[CC_id] = first_rb[CC_id] + 45;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 45;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 21;
+              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 20; 
             }
           }
-        } else if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].ue_priority  == SCH_UL_INACTIVE ) {
+        } 
+        
+        else if ( ulsch_ue_select[CC_id].list[ulsch_ue_num].ue_priority  == SCH_UL_INACTIVE ) {
+          LOG_D(MAC, "SCH_UL_INACTIVE \n");
           // assigne RBS( 3 RBs)
           first_rb[CC_id] = first_rb[CC_id] + 3;
           UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 3;
@@ -3202,8 +3214,8 @@ void schedule_ulsch_rnti_fairRR(module_id_t   module_idP,
         if (UE_template->pre_allocated_rb_table_index_ul >=0) {
           rb_table_index=UE_template->pre_allocated_rb_table_index_ul;
         } else {
-          UE_template->mcs_UL[harq_pid]=10;//cmin (10, openair_daq_vars.target_ue_ul_mcs);
-          rb_table_index=5; // for PHR
+          UE_template->mcs_UL[harq_pid]=20;//cmin (10, openair_daq_vars.target_ue_ul_mcs);
+          rb_table_index=21; // for PHR
         }
         if( (UE_sched_ctrl->ul_scheduled | (1<<harq_pid))>0 ){
           UE_template->scheduled_ul_bytes -= UE_template->TBS_UL[harq_pid];
