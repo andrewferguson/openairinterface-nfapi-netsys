@@ -1042,7 +1042,7 @@ void dlsch_scheduler_pre_processor_fairRR (module_id_t   Mod_id,
         break;
       }
 
-      if (temp_total_rbs_count == 0) {
+      if (temp_total_rbs_count == 0) { 
         dlsch_ue_select[CC_id].ue_num = i+1;
         break;
       }
@@ -2788,16 +2788,16 @@ void ulsch_scheduler_pre_processor_fairRR(module_id_t module_idP,
           } else {
             if (mac_eNB_get_rrc_status(module_idP,UE_RNTI(module_idP, UE_id)) < RRC_CONNECTED) {
               // assigne RBS( 6 RBs)
-              first_rb[CC_id] = first_rb[CC_id] + 45;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 45;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 21;
-              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 20;
+              first_rb[CC_id] = first_rb[CC_id] + 6;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 6;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 5;
+              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 10;
             } else {
               // assigne RBS( 5 RBs)
-              first_rb[CC_id] = first_rb[CC_id] + 45;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 45;
-              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 21;
-              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 20; 
+              first_rb[CC_id] = first_rb[CC_id] + 5;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_nb_rb_ul = 5;
+              UE_info->UE_template[CC_id][UE_id].pre_allocated_rb_table_index_ul = 4;
+              UE_info->UE_template[CC_id][UE_id].pre_assigned_mcs_ul = 10; 
             }
           }
         } 
@@ -3214,8 +3214,8 @@ void schedule_ulsch_rnti_fairRR(module_id_t   module_idP,
         if (UE_template->pre_allocated_rb_table_index_ul >=0) {
           rb_table_index=UE_template->pre_allocated_rb_table_index_ul;
         } else {
-          UE_template->mcs_UL[harq_pid]=20;//cmin (10, openair_daq_vars.target_ue_ul_mcs);
-          rb_table_index=21; // for PHR
+          UE_template->mcs_UL[harq_pid]=10;//cmin (10, openair_daq_vars.target_ue_ul_mcs);
+          rb_table_index=5; // for PHR
         }
         if( (UE_sched_ctrl->ul_scheduled | (1<<harq_pid))>0 ){
           UE_template->scheduled_ul_bytes -= UE_template->TBS_UL[harq_pid];
