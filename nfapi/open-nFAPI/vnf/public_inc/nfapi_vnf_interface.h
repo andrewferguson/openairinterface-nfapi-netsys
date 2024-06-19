@@ -460,7 +460,7 @@ typedef struct nfapi_vnf_config
  * \return A pointer to a vnf config structure
  */
 nfapi_vnf_config_t* nfapi_vnf_config_create(void);
-
+nfapi_vnf_config_t* nfapi_vnf_config_enbid_create(uint16_t);
 /*! Delete an vnf config
  */
 void nfapi_vnf_config_destory(nfapi_vnf_config_t* config);
@@ -699,7 +699,7 @@ typedef struct nfapi_vnf_p7_config
 	 *
 	 * \todo Need some way the tell the VNF how long it has
 	 */
-	
+	int phy_id;
 	int (*subframe_indication)(struct nfapi_vnf_p7_config* config, uint16_t phy_id, uint16_t sfn_sf);
 	int (*slot_indication)(struct nfapi_vnf_p7_config* config, uint16_t phy_id, uint16_t sfn, uint16_t slot);
 

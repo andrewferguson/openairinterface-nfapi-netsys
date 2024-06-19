@@ -24,7 +24,7 @@
 #include "PHY/impl_defs_nr.h"
 
 #define NFAPI_UE_MAX_NUM_CB 8
-#define NFAPI_MAX_NUM_UL_PDU 8
+#define NFAPI_MAX_NUM_UL_PDU 255
 
 /*
   typedef unsigned int	   uint32_t;
@@ -413,6 +413,7 @@ typedef struct {
   uint8_t num_dci_options;  // Num DCIs the UE actually needs to decode (1 or 2)
   uint8_t dci_length_options[2];
   uint8_t dci_format_options[2];
+  uint8_t dci_type_options[2];
 } fapi_nr_dl_config_dci_dl_pdu_rel15_t;
 
 typedef struct {
@@ -478,6 +479,7 @@ typedef struct {
   uint8_t nscid;
   uint16_t dlDmrsScramblingId;
   uint16_t pduBitmap;
+  uint32_t k1_feedback;
 } fapi_nr_dl_config_dlsch_pdu_rel15_t;
 
 typedef struct {
@@ -1080,6 +1082,10 @@ typedef struct
   uint8_t prach_multiple_carriers_in_a_band;//0 = disabled 1 = enabled
 
 } fapi_nr_prach_config_t;
+
+typedef struct {
+  uint16_t target_Nid_cell;
+} fapi_nr_synch_request_t;
 
 typedef struct {
   uint32_t config_mask;

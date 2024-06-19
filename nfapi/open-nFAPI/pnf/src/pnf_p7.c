@@ -967,7 +967,7 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 			slot = shifted_slot;
 
 			//
-			// DJP - why does the shift not apply to pnf_p7->sfn_sf???
+			// why does the shift not apply to pnf_p7->sfn_sf???
 			//
 
 			pnf_p7->slot_shift = 0;
@@ -1219,7 +1219,7 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 			sfn_sf = shifted_sfn_sf;
 
                         //
-                        // DJP - why does the shift not apply to pnf_p7->sfn_sf???
+                        // why does the shift not apply to pnf_p7->sfn_sf???
                         //
 
 			pnf_p7->sfn_sf_shift = 0;
@@ -3060,7 +3060,7 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = pnf_p7->_public.local_p7_port;
+	addr.sin_port = htons(pnf_p7->_public.local_p7_port);
 
 	if(pnf_p7->_public.local_p7_addr == 0)
 	{
@@ -3232,7 +3232,7 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = pnf_p7->_public.local_p7_port;
+	addr.sin_port = htons(pnf_p7->_public.local_p7_port);
 
 	if(pnf_p7->_public.local_p7_addr == 0)
 	{

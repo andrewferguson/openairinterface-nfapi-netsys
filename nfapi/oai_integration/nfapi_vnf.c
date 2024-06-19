@@ -335,8 +335,8 @@ int pnf_nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_pa
   memset(&req, 0, sizeof(req));
   req.header.message_id = NFAPI_PNF_CONFIG_REQUEST;
   req.pnf_phy_rf_config.tl.tag = NFAPI_PNF_PHY_RF_TAG;
-  req.pnf_phy_rf_config.number_phy_rf_config_info = 2; // DJP pnf.phys.size();
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "DJP:Hard coded num phy rf to 2\n");
+  req.pnf_phy_rf_config.number_phy_rf_config_info = 2; // pnf.phys.size();
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "Hard coded num phy rf to 2\n");
 
   for(unsigned i = 0; i < 2; ++i) {
     req.pnf_phy_rf_config.phy_rf_config[i].phy_id = pnf->phys[i].id;
@@ -378,8 +378,8 @@ int pnf_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_pnf_param_re
   memset(&req, 0, sizeof(req));
   req.header.message_id = NFAPI_PNF_CONFIG_REQUEST;
   req.pnf_phy_rf_config.tl.tag = NFAPI_PNF_PHY_RF_TAG;
-  req.pnf_phy_rf_config.number_phy_rf_config_info = 2; // DJP pnf.phys.size();
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "DJP:Hard coded num phy rf to 2\n");
+  req.pnf_phy_rf_config.number_phy_rf_config_info = 2; // pnf.phys.size();
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "Hard coded num phy rf to 2\n");
 
   for(unsigned i = 0; i < 2; ++i) {
     req.pnf_phy_rf_config.phy_rf_config[i].phy_id = pnf->phys[i].id;
@@ -424,6 +424,7 @@ int pnf_config_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_pnf_config_
     memset(&req, 0, sizeof(req));
     req.header.phy_id = resp->header.phy_id;
     req.header.message_id = NFAPI_PNF_START_REQUEST;
+     NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] phy_id : %d, message_id : %d \n", resp->header.phy_id, NFAPI_PNF_START_REQUEST);
     nfapi_vnf_pnf_start_req(config, p5_idx, &req);
   } else {
     // Rather than send the pnf_start_request we will demonstrate
@@ -1574,7 +1575,7 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   phy_info *phy = pnf->phys;
   struct sockaddr_in pnf_p7_sockaddr;
   nfapi_nr_config_request_scf_t *req = &RC.nrmac[0]->config[0]; // check
-  phy->remote_port = 50610;//resp->nfapi_config.p7_pnf_port.value;
+  phy->remote_port = resp->nfapi_config.p7_pnf_port.value;
   //phy->remote_port = 32123;//resp->nfapi_config.p7_pnf_port.value;
   memcpy(&pnf_p7_sockaddr.sin_addr.s_addr, &(resp->nfapi_config.p7_pnf_address_ipv4.address[0]), 4);
   phy->remote_addr = inet_ntoa(pnf_p7_sockaddr.sin_addr);
@@ -1589,13 +1590,13 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   req->nfapi_config.p7_vnf_port.tl.tag = NFAPI_NR_NFAPI_P7_VNF_PORT_TAG;
   req->nfapi_config.p7_vnf_port.value = p7_vnf->local_port;
   req->num_tlv++;
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] DJP local_port:%d\n", p7_vnf->local_port);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Local_port:%d\n", ntohs(p7_vnf->local_port));
   req->nfapi_config.p7_vnf_address_ipv4.tl.tag = NFAPI_NR_NFAPI_P7_VNF_ADDRESS_IPV4_TAG;
   struct sockaddr_in vnf_p7_sockaddr;
   vnf_p7_sockaddr.sin_addr.s_addr = inet_addr(p7_vnf->local_addr);
   memcpy(&(req->nfapi_config.p7_vnf_address_ipv4.address[0]), &vnf_p7_sockaddr.sin_addr.s_addr, 4);
   req->num_tlv++;
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] DJP local_addr:%s\n", p7_vnf->local_addr);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Local_addr:%s\n", p7_vnf->local_addr);
   req->nfapi_config.timing_window.tl.tag = NFAPI_NR_NFAPI_TIMING_WINDOW_TAG;
   req->nfapi_config.timing_window.value = p7_vnf->timing_window;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "\n[VNF]Timing window tag : %d Timing window:%u\n",NFAPI_NR_NFAPI_TIMING_WINDOW_TAG, p7_vnf->timing_window);
@@ -1632,6 +1633,8 @@ req->nfapi_config.tx_data_timing_offset.tl.tag = NFAPI_NR_NFAPI_TX_DATA_TIMING_O
 int param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_param_response_t *resp) {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Received NFAPI_PARAM_RESP idx:%d phy_id:%d\n", p5_idx, resp->header.phy_id);
   vnf_info *vnf = (vnf_info *)(config->user_data);
+  if (get_softmodem_params()->virtual_time)
+    printf("[VNF] Virtual time enabled\n");
   vnf_p7_info *p7_vnf = vnf->p7_vnfs;
   pnf_info *pnf = vnf->pnfs;
   phy_info *phy = pnf->phys;
@@ -1649,13 +1652,13 @@ int param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_param_response_t
   req->nfapi_config.p7_vnf_port.tl.tag = NFAPI_NFAPI_P7_VNF_PORT_TAG;
   req->nfapi_config.p7_vnf_port.value = p7_vnf->local_port;
   req->num_tlv++;
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] DJP local_port:%d\n", p7_vnf->local_port);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Local_port:%d\n", ntohs(p7_vnf->local_port));
   req->nfapi_config.p7_vnf_address_ipv4.tl.tag = NFAPI_NFAPI_P7_VNF_ADDRESS_IPV4_TAG;
   struct sockaddr_in vnf_p7_sockaddr;
   vnf_p7_sockaddr.sin_addr.s_addr = inet_addr(p7_vnf->local_addr);
   memcpy(&(req->nfapi_config.p7_vnf_address_ipv4.address[0]), &vnf_p7_sockaddr.sin_addr.s_addr, 4);
   req->num_tlv++;
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] DJP local_addr:%s\n", p7_vnf->local_addr);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Local_addr:%s\n", p7_vnf->local_addr);
   req->nfapi_config.timing_window.tl.tag = NFAPI_NFAPI_TIMING_WINDOW_TAG;
   req->nfapi_config.timing_window.value = p7_vnf->timing_window;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Timing window:%u\n", p7_vnf->timing_window);
@@ -1788,7 +1791,7 @@ void vnf_start_thread(void *ptr) {
 
 static vnf_info vnf;
 
-void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port) {
+void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port) {
   nfapi_setmode(NFAPI_MODE_VNF);
   memset(&vnf, 0, sizeof(vnf));
   memset(vnf.p7_vnfs, 0, sizeof(vnf.p7_vnfs));
@@ -1799,9 +1802,7 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port) {
   vnf.p7_vnfs[0].config = nfapi_vnf_p7_config_create();
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %s() vnf.p7_vnfs[0].config:%p VNF ADDRESS:%s:%d\n", __FUNCTION__, vnf.p7_vnfs[0].config, vnf_addr, vnf_p5_port);
   strcpy(vnf.p7_vnfs[0].local_addr, vnf_addr);
-  //vnf.p7_vnfs[0].local_port = vnf.p7_vnfs[0].local_port; // 50001; // TODO: remove hardcode
-  vnf.p7_vnfs[0].local_port = 50611;  
-  //vnf.p7_vnfs[0].local_port = 50011;
+  vnf.p7_vnfs[0].local_port = vnf_p7_port;
   vnf.p7_vnfs[0].mac = (mac_t *)malloc(sizeof(mac_t));
   nfapi_vnf_config_t *config = nfapi_vnf_config_create();
   config->malloc = malloc;
@@ -1839,7 +1840,9 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port) {
 }
 
 
-void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, int vnf_p7_port) {
+void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port, int *enb_id) {
+  printf("enb_id : %d \n",*enb_id);
+  uint16_t id = *enb_id;
   nfapi_setmode(NFAPI_MODE_VNF);
   memset(&vnf, 0, sizeof(vnf));
   memset(vnf.p7_vnfs, 0, sizeof(vnf.p7_vnfs));
@@ -1848,11 +1851,12 @@ void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, int vnf_p7_port) {
   vnf.p7_vnfs[0].aperiodic_timing_enabled = 0;
   vnf.p7_vnfs[0].periodic_timing_period = 10;
   vnf.p7_vnfs[0].config = nfapi_vnf_p7_config_create();
+  vnf.p7_vnfs[0].config->phy_id = id;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %s() vnf.p7_vnfs[0].config:%p VNF ADDRESS:%s:%d\n", __FUNCTION__, vnf.p7_vnfs[0].config, vnf_addr, vnf_p5_port);
   strcpy(vnf.p7_vnfs[0].local_addr, vnf_addr);
   vnf.p7_vnfs[0].local_port = vnf_p7_port;
   vnf.p7_vnfs[0].mac = (mac_t *)malloc(sizeof(mac_t));
-  nfapi_vnf_config_t *config = nfapi_vnf_config_create();
+  nfapi_vnf_config_t *config = nfapi_vnf_config_enbid_create(id);
   config->malloc = malloc;
   config->free = free;
   config->vnf_p5_port = vnf_p5_port;
@@ -1863,7 +1867,6 @@ void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, int vnf_p7_port) {
 
   config->pnf_connection_indication = &pnf_connection_indication_cb;
   config->pnf_disconnect_indication = &pnf_disconnection_indication_cb;
-
   config->pnf_param_resp = &pnf_param_resp_cb;
   config->pnf_config_resp = &pnf_config_resp_cb;
   config->pnf_start_resp = &pnf_start_resp_cb;
@@ -1889,7 +1892,8 @@ void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, int vnf_p7_port) {
 
 int oai_nfapi_dl_config_req(nfapi_dl_config_request_t *dl_config_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  dl_config_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  // printf("phy id in dl config %d \n",vnf.p7_vnfs[0].config->phy_id );
+  dl_config_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   dl_config_req->header.message_id = NFAPI_DL_CONFIG_REQUEST;
   LOG_D(PHY, "[VNF] %s() DL_CONFIG_REQ sfn_sf:%d_%d number_of_pdus:%d\n", __FUNCTION__,
         NFAPI_SFNSF2SFN(dl_config_req->sfn_sf),NFAPI_SFNSF2SF(dl_config_req->sfn_sf), dl_config_req->dl_config_request_body.number_pdu);
@@ -1926,7 +1930,7 @@ int oai_nfapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
   LOG_D(NR_PHY, "Entering oai_nfapi_nr_dl_config_req sfn:%d,slot:%d\n", dl_config_req->SFN, dl_config_req->Slot);
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
   dl_config_req->header.message_id= NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST;
-  dl_config_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  dl_config_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
 
   int retval = nfapi_vnf_p7_nr_dl_config_req(p7_config, dl_config_req);
 
@@ -1944,7 +1948,7 @@ int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
 {
   LOG_D(NR_PHY, "Entering oai_nfapi_nr_tx_data_req sfn:%d,slot:%d\n", tx_data_req->SFN, tx_data_req->Slot);
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  tx_data_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  tx_data_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   tx_data_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST;
   //LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_req->sfn_sf), tx_req->tx_request_body.number_of_pdus);
   int retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
@@ -1961,7 +1965,7 @@ int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
 int oai_nfapi_tx_req(nfapi_tx_request_t *tx_req)
 {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  tx_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  tx_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   tx_req->header.message_id = NFAPI_TX_REQUEST;
   //LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_req->sfn_sf), tx_req->tx_request_body.number_of_pdus);
   int retval = nfapi_vnf_p7_tx_req(p7_config, tx_req);
@@ -1977,7 +1981,7 @@ int oai_nfapi_tx_req(nfapi_tx_request_t *tx_req)
 
 int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  ul_dci_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ul_dci_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   ul_dci_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST;
   //LOG_D(PHY, "[VNF] %s() HI_DCI0_REQ sfn_sf:%d dci:%d hi:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(hi_dci0_req->sfn_sf), hi_dci0_req->hi_dci0_request_body.number_of_dci, hi_dci0_req->hi_dci0_request_body.number_of_hi);
   int retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
@@ -1993,7 +1997,7 @@ int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req) {
 
 int oai_nfapi_hi_dci0_req(nfapi_hi_dci0_request_t *hi_dci0_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  hi_dci0_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  hi_dci0_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   hi_dci0_req->header.message_id = NFAPI_HI_DCI0_REQUEST;
   //LOG_D(PHY, "[VNF] %s() HI_DCI0_REQ sfn_sf:%d dci:%d hi:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(hi_dci0_req->sfn_sf), hi_dci0_req->hi_dci0_request_body.number_of_dci, hi_dci0_req->hi_dci0_request_body.number_of_hi);
   int retval = nfapi_vnf_p7_hi_dci0_req(p7_config, hi_dci0_req);
@@ -2030,7 +2034,7 @@ static void remove_ul_config_req_pdu(int index, nfapi_ul_config_request_t *ul_co
 int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
 
-  ul_tti_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ul_tti_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   ul_tti_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST;
 
   int retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
@@ -2049,7 +2053,7 @@ int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req) {
 
 int oai_nfapi_ul_config_req(nfapi_ul_config_request_t *ul_config_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
-  ul_config_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ul_config_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
   ul_config_req->header.message_id = NFAPI_UL_CONFIG_REQUEST;
   //LOG_D(PHY, "[VNF] %s() header message_id:%02x\n", __FUNCTION__, ul_config_req->header.message_id);
   //LOG_D(PHY, "[VNF] %s() UL_CONFIG sfn_sf:%d PDUs:%d rach_prach_frequency_resources:%d srs_present:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ul_config_req->sfn_sf), ul_config_req->ul_config_request_body.number_of_pdus, ul_config_req->ul_config_request_body.rach_prach_frequency_resources, ul_config_req->ul_config_request_body.srs_present);
@@ -2110,7 +2114,7 @@ int oai_nfapi_ue_release_req(nfapi_ue_release_request_t *release_req){
         return 0;
     nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
 
-    release_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+    release_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
     release_req->header.message_id = NFAPI_UE_RELEASE_REQUEST;
     release_req->ue_release_request_body.tl.tag = NFAPI_UE_RELEASE_BODY_TAG;
 

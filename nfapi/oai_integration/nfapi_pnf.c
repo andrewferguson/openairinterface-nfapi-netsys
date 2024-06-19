@@ -562,7 +562,7 @@ int param_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
   nfapi_resp.num_tlv++;
   // P7 PNF Port
   nfapi_resp.nfapi_config.p7_pnf_port.tl.tag = NFAPI_NFAPI_P7_PNF_PORT_TAG;
-  nfapi_resp.nfapi_config.p7_pnf_port.value = 32123; // DJP - hard code alert!!!! FIXME TODO
+  nfapi_resp.nfapi_config.p7_pnf_port.value = htons(pnf->phys[0].udp.rx_port);
   nfapi_resp.num_tlv++;
   nfapi_pnf_param_resp(config, &nfapi_resp);
   printf("[PNF] Sent NFAPI_PARAM_RESPONSE phy_id:%d number_of_tlvs:%u\n", req->header.phy_id, nfapi_resp.num_tlv);
@@ -578,7 +578,7 @@ int nr_param_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   memset(&nfapi_resp, 0, sizeof(nfapi_resp));
   nfapi_resp.header.message_id = NFAPI_NR_PHY_MSG_TYPE_PARAM_RESPONSE;
   nfapi_resp.header.phy_id = req->header.phy_id;
-  nfapi_resp.error_code = 0; // DJP - what value???
+  nfapi_resp.error_code = 0;
   struct sockaddr_in pnf_p7_sockaddr;
   
   // ASSIGN TAGS
@@ -775,7 +775,7 @@ int nr_param_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   nfapi_resp.num_tlv++;
   }
 
-  nfapi_resp.nfapi_config.p7_pnf_port.value = 32123; //pnf->phys[0].local_port; DJP - hard code alert!!!! FIXME TODO
+  nfapi_resp.nfapi_config.p7_pnf_port.value = htons(pnf->phys[0].udp.rx_port);
   nfapi_resp.num_tlv++;
   pnf_p7_sockaddr.sin_addr.s_addr = inet_addr(pnf->phys[0].local_addr);
   
@@ -1631,8 +1631,7 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
   p7_config->phy_id = phy->phy_id;
   p7_config->remote_p7_port = phy_info->remote_port;
   p7_config->remote_p7_addr = phy_info->remote_addr;
-  p7_config->local_p7_port = 32123;//phy_info->local_port;//50010; // DJP - good grief cannot seem to get the right answer phy_info->local_port;
-  //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
+  p7_config->local_p7_port = phy_info->udp.rx_port;
   p7_config->local_p7_addr = phy_info->local_addr;
   printf("[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port, p7_config->local_p7_addr, p7_config->local_p7_port);
   p7_config->user_data = phy_info;
@@ -1750,9 +1749,8 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy,  n
   p7_config->phy_id = phy->phy_id;
   p7_config->remote_p7_port = phy_info->remote_port;
   p7_config->remote_p7_addr = phy_info->remote_addr;
-  // TODO: remove this hardcoded port
-  p7_config->local_p7_port = 32123; // DJP - good grief cannot seem to get the right answer phy_info->local_port;
-  //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
+
+  p7_config->local_p7_port = phy_info->udp.rx_port;
   p7_config->local_p7_addr = phy_info->local_addr;
   printf("[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port, p7_config->local_p7_addr, p7_config->local_p7_port);
   p7_config->user_data = phy_info;
@@ -1828,7 +1826,6 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy,  n
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating P7 thread %s\n", __FUNCTION__);
   pthread_t p7_thread;
   pthread_create(&p7_thread, NULL, &pnf_nr_p7_thread_start, p7_config);
-  //((pnf_phy_user_data_t*)(phy_info->fapi->user_data))->p7_config = p7_config;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Calling l1_north_init_eNB() %s\n", __FUNCTION__);
   l1_north_init_gNB();
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] DJP - HACK - Set p7_config global ready for subframe ind%s\n", __FUNCTION__);
@@ -1869,7 +1866,7 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy,  n
   nfapi_pnf_p7_slot_ind(p7_config, p7_config->phy_id, 0, 0);
   printf("[PNF] Sent first P7 slot ind\n");
 #else
-  nfapi_pnf_p7_subframe_ind(p7_config, p7_config->phy_id, 0); // DJP - SFN_SF set to zero - correct???
+  nfapi_pnf_p7_subframe_ind(p7_config, p7_config->phy_id, 0); // SFN_SF set to zero - correct???
   printf("[PNF] Sent first P7 subframe ind\n");
 #endif
   
@@ -1983,8 +1980,6 @@ int broadcast_detect_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t 
     case NFAPI_RAT_TYPE_UTRAN: {
       ind.utran_broadcast_detect_indication.tl.tag = NFAPI_UTRAN_BROADCAST_DETECT_INDICATION_TAG;
       ind.utran_broadcast_detect_indication.mib_length = 4;
-      //ind.utran_broadcast_detect_indication.mib...
-      // ind.utran_broadcast_detect_indication.sfn_offset; DJP - nonsense line
     }
     break;
   }
@@ -2150,7 +2145,7 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->vnf_ip_addr = vnf_ip_addr;
   config->vnf_p5_port = vnf_p5_port;
   pnf.phys[0].udp.enabled = 1;
-  pnf.phys[0].udp.rx_port = 32123;//pnf_p7_port;
+  pnf.phys[0].udp.rx_port = pnf_p7_port;
   pnf.phys[0].udp.tx_port = vnf_p7_port;
   strcpy(pnf.phys[0].udp.tx_addr, vnf_ip_addr);
   strcpy(pnf.phys[0].local_addr, pnf_ip_addr);
@@ -2201,7 +2196,7 @@ void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->vnf_ip_addr = vnf_ip_addr;
   config->vnf_p5_port = vnf_p5_port;
   pnf.phys[0].udp.enabled = 1;
-  pnf.phys[0].udp.rx_port = 32123;//pnf_p7_port;
+  pnf.phys[0].udp.rx_port = pnf_p7_port;
   pnf.phys[0].udp.tx_port = vnf_p7_port;
   strcpy(pnf.phys[0].udp.tx_addr, vnf_ip_addr);
   strcpy(pnf.phys[0].local_addr, pnf_ip_addr);
@@ -2243,7 +2238,7 @@ void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, 
 void oai_subframe_ind(uint16_t sfn, uint16_t sf) {
   //LOG_D(PHY,"%s(sfn:%d, sf:%d)\n", __FUNCTION__, sfn, sf);
 
-  //TODO FIXME - HACK - DJP - using a global to bodge it in
+  //TODO FIXME - HACK - using a global to bodge it in
   if (p7_config_g != NULL && sync_var==0) {
     uint16_t sfn_sf_tx = sfn<<4 | sf; 
 
@@ -2301,21 +2296,21 @@ int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind) {
 }
 
 int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) {
-  crc_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  crc_ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   crc_ind->header.message_id = NFAPI_CRC_INDICATION;
   //LOG_D(PHY, "%s() sfn_sf:%d number_of_crcs:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(crc_ind->sfn_sf), crc_ind->crc_indication_body.number_of_crcs);
   return nfapi_pnf_p7_crc_ind(p7_config_g, crc_ind);
 }
 
 int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_RX_CQI_INDICATION;
   //LOG_D(PHY, "%s() sfn_sf:%d number_of_cqis:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->cqi_indication_body.number_of_cqis);
   return nfapi_pnf_p7_cqi_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_RX_ULSCH_INDICATION;
   int retval = nfapi_pnf_p7_rx_ind(p7_config_g, ind);
   //LOG_D(PHY,"%s() SFN/SF:%d pdus:%d retval:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->rx_indication_body.number_of_pdus, retval);
@@ -2324,7 +2319,7 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) {
 }
 
 int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   int retval = nfapi_pnf_p7_sr_ind(p7_config_g, ind);
   //LOG_D(PHY,"%s() SFN/SF:%d srs:%d retval:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->sr_indication_body.number_of_srs, retval);
   //free(ind.rx_indication_body.rx_pdu_list);
@@ -2340,31 +2335,31 @@ int oai_nfapi_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind) {
 }
 
 int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION;
   return nfapi_pnf_p7_nr_rx_data_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION;
   return nfapi_pnf_p7_nr_crc_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION;
   return nfapi_pnf_p7_nr_srs_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION;
   return nfapi_pnf_p7_nr_uci_ind(p7_config_g, ind);
 }
 
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind) {
-  ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ind->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION;
   return nfapi_pnf_p7_nr_rach_ind(p7_config_g, ind);
 }

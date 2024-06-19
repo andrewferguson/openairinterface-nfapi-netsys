@@ -31,7 +31,33 @@
 
 #include "vnf.h"
 
+nfapi_vnf_config_t* nfapi_vnf_config_enbid_create(uint16_t enb_id){
+	printf("Creating enb id : %d \n",enb_id);
 
+	vnf_t* _this = (vnf_t*)calloc(1, sizeof(vnf_t));
+
+	if(_this == 0)
+		return 0;
+
+	_this->sctp = 1;
+	
+	_this->next_phy_id = enb_id;
+	
+	// Set the default P5 port
+	_this->_public.vnf_p5_port = NFAPI_P5_SCTP_PORT;
+	
+	// set the default memory allocation 
+	_this->_public.malloc = &malloc;
+	_this->_public.free = &free;
+	
+	// set the default memory allocation 
+	_this->_public.codec_config.allocate = &malloc;
+	_this->_public.codec_config.deallocate = &free;
+	
+
+	return (nfapi_vnf_config_t* )_this;
+
+}
 
 nfapi_vnf_config_t* nfapi_vnf_config_create()
 {

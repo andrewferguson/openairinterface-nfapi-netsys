@@ -25,7 +25,9 @@
 #include <errno.h>
 #include <stdio.h>
 #include <assert.h>
+#include "softmodem-common.h"
 
+#include "nfapi_vnf.h"
 #include "vnf_p7.h"
 
 #ifdef NDEBUG
@@ -417,47 +419,70 @@ uint16_t increment_sfn_sf_by(uint16_t sfn_sf, uint8_t increment)
 	return sfn_sf;
 }
 
-int send_mac_slot_indications(vnf_p7_t* vnf_p7)
+void vnf_handle_subframe_indication(void* pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7)
+{
+  if (pRecvMsg == NULL || vnf_p7 == NULL) {
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: NULL parameters\n", __FUNCTION__);
+    return;
+  }
+
+  nfapi_subframe_indication_t ind;
+  if (nfapi_p7_message_unpack(pRecvMsg, recvMsgLen, &ind, sizeof(ind), &vnf_p7->_public.codec_config) < 0) {
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: Failed to unpack message\n", __FUNCTION__);
+    return;
+  }
+
+  uint8_t* p = (uint8_t*)pRecvMsg;
+  uint16_t sfnsf = p[16] << 8 | p[17];
+  vnf_p7->sf_start_time_hr = vnf_get_current_time_hr();
+  if (vnf_p7->_public.subframe_indication) {
+    send_mac_subframe_indications(vnf_p7, sfnsf);
+  }
+}
+
+int send_mac_slot_indications(vnf_p7_t* vnf_p7, uint16_t sfn, uint16_t slot)
 {
 	nfapi_vnf_p7_connection_info_t* curr = vnf_p7->p7_connections;
-	while(curr != 0)
-	{
-		if(curr->in_sync == 1)
-		{
-			// ask for subframes in the future
+
+  while (curr != 0) {
+    if (curr->in_sync == 1 && get_softmodem_params()->virtual_time) {
+      // ask for subframes in the future
 			//uint16_t sfn_sf_adv = increment_sfn_sf_by(curr->sfn_sf, 2);
 
 			//vnf_p7->_public.subframe_indication(&(vnf_p7->_public), curr->phy_id, sfn_sf_adv);
             // suggestion fix by Haruki NAOI
 			//printf("\nsfn:%d, slot:%d\n",curr->sfn,curr->slot);
-			vnf_p7->_public.slot_indication(&(vnf_p7->_public), curr->phy_id, curr->sfn,curr->slot);
-		}
+      vnf_p7->_public.slot_indication(&(vnf_p7->_public), curr->phy_id, curr->sfn, curr->slot);
+    } else if (get_softmodem_params()->virtual_time) {
+      vnf_p7->_public.slot_indication(&(vnf_p7->_public), curr->phy_id, sfn, slot);
+    }
 
-		curr = curr->next;
-	}
+    curr = curr->next;
+  }
 
-	return 0;
+  return 0;
 }
 
-int send_mac_subframe_indications(vnf_p7_t* vnf_p7)
+int send_mac_subframe_indications(vnf_p7_t* vnf_p7, uint16_t sfn_sf)
 {
 	nfapi_vnf_p7_connection_info_t* curr = vnf_p7->p7_connections;
-	while(curr != 0)
-	{
-		if(curr->in_sync == 1)
-		{
-			// ask for subframes in the future
+
+  while (curr != 0) {
+    if (curr->in_sync == 1 && !get_softmodem_params()->virtual_time) {
+      // ask for subframes in the future
 			//uint16_t sfn_sf_adv = increment_sfn_sf_by(curr->sfn_sf, 2);
 
 			//vnf_p7->_public.subframe_indication(&(vnf_p7->_public), curr->phy_id, sfn_sf_adv);
             // suggestion fix by Haruki NAOI
-			vnf_p7->_public.subframe_indication(&(vnf_p7->_public), curr->phy_id, curr->sfn_sf);
-		}
+      vnf_p7->_public.subframe_indication(&(vnf_p7->_public), curr->phy_id, curr->sfn_sf);
+    } else if (get_softmodem_params()->virtual_time) {
+      vnf_p7->_public.subframe_indication(&(vnf_p7->_public), curr->phy_id, sfn_sf);
+    }
 
-		curr = curr->next;
-	}
+    curr = curr->next;
+  }
 
-	return 0;
+  return 0;
 }
 
 int vnf_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info, uint8_t* msg, const uint32_t len)
@@ -2146,7 +2171,11 @@ void vnf_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7)
 			vnf_handle_ue_release_resp(pRecvMsg, recvMsgLen, vnf_p7);
 			break;
 
-		default:
+    case NFAPI_SUBFRAME_INDICATION:
+      vnf_handle_subframe_indication(pRecvMsg, recvMsgLen, vnf_p7);
+      break;
+
+    default:
 			{
 				if(header.message_id >= NFAPI_VENDOR_EXT_MSG_MIN &&
 				   header.message_id <= NFAPI_VENDOR_EXT_MSG_MAX)
