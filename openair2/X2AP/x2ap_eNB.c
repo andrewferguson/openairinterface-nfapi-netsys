@@ -409,11 +409,20 @@ void x2ap_eNB_handle_handover_req(instance_t instance,
   int                 ue_id;
 
   int target_pci = x2ap_handover_req->target_physCellId;
-
+  LOG_D(X2AP, "target eNB id %d \n", target_pci);
   instance_p = x2ap_eNB_get_instance(instance);
   DevAssert(instance_p != NULL);
+  
+  target = x2ap_is_eNB_id_in_list(target_pci);
+  if(target == NULL){
+    LOG_D(X2AP, "target eNB id %d not found using x2ap_is_eNB_id_in_list \n ", target_pci);
+    target = x2ap_is_eNB_pci_in_list(target_pci);
 
-  target = x2ap_is_eNB_pci_in_list(target_pci);
+  }
+  else
+     LOG_D(X2AP, "target eNB id %d found using x2ap_is_eNB_id_in_list \n ", target_pci);
+  if(target == NULL)
+    LOG_D(X2AP, "target eNB id %d  not found using x2ap_is_eNB_pci_in_list. Will crash \n ", target_pci);
   DevAssert(target != NULL);
 
   /* allocate x2ap ID */
@@ -640,6 +649,7 @@ void *x2ap_task(void *arg) {
 
   while (1) {
     itti_receive_msg(TASK_X2AP, &received_msg);
+    if(ITTI_MSG_ID(received_msg) != 140)
     LOG_D(X2AP, "Received message %d:%s\n",
 	       ITTI_MSG_ID(received_msg), ITTI_MSG_NAME(received_msg));
     switch (ITTI_MSG_ID(received_msg)) {

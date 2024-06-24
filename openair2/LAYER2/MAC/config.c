@@ -882,7 +882,7 @@ int rrc_mac_config_req_eNB(module_id_t Mod_idP,
 
   if (logicalChannelIdentity > 0) { // is SRB1,2 or DRB
     if ((UE_id = find_UE_id(Mod_idP, rntiP)) < 0) {
-      LOG_E(MAC,"Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
+      LOG_E(MAC,"[885]Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
       return(-1);
     }
     int idx = -1;
@@ -913,7 +913,7 @@ int rrc_mac_config_req_eNB(module_id_t Mod_idP,
     UE_id = find_UE_id(Mod_idP, rntiP);
 
     if (UE_id<0) {
-      LOG_E(MAC,"Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
+      LOG_E(MAC,"[916]Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
       return(-1);
     }
 
@@ -927,7 +927,7 @@ int rrc_mac_config_req_eNB(module_id_t Mod_idP,
     UE_id = find_UE_id(Mod_idP, rntiP);
 
     if (UE_id<0) {
-      LOG_E(MAC,"Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
+      LOG_E(MAC,"[930]Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
       return(-1);
     }
 
@@ -937,7 +937,7 @@ int rrc_mac_config_req_eNB(module_id_t Mod_idP,
 
   if (sCellToAddMod_r10 != NULL) {
     if (UE_id<0) {
-      LOG_E(MAC,"Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
+      LOG_E(MAC,"[940]Configuration received for unknown UE (%x), shouldn't happen\n",rntiP);
       return(-1);
     }
 
