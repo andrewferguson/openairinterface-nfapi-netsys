@@ -1045,7 +1045,7 @@ void schedule_response(Sched_Rsp_t *Sched_INFO, void *arg) {
     LOG_D(PHY,"NFAPI: Sending subframe indication to PNF\n");
     nfapi_subframe_indication_t *subframe_ind;
     subframe_ind->header.message_id = NFAPI_SUBFRAME_INDICATION;
-    subframe_ind.header.phy_id = DL_req->header.phy_id;
+    subframe_ind->header.phy_id = DL_req->header.phy_id;
     subframe_ind->sfn_sf = DL_req->sfn_sf;
     oai_nfapi_subframe_ind(subframe_ind);
 
