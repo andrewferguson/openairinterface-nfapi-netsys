@@ -1040,6 +1040,15 @@ void schedule_response(Sched_Rsp_t *Sched_INFO, void *arg) {
       handle_nfapi_ul_pdu(eNB,proc,ul_config_pdu,UL_req->sfn_sf>>4,UL_req->sfn_sf&0xf,UL_req->ul_config_request_body.srs_present);
     }
   }
+  if(NFAPI_MODE!=NFAPI_MONOLITHIC){
+    // send subframe indication to PNF
+    LOG_D(PHY,"NFAPI: Sending subframe indication to PNF\n");
+    nfapi_subframe_indication_t *subframe_ind = &eNB->UL_INFO.subframe_ind;
+    subframe_ind->sfn_sf = frame << 4 | subframe;
+    oai_nfapi_subframe_ind(subframe_ind);
+
+  }
+
 }
 
 /*Dummy functions*/

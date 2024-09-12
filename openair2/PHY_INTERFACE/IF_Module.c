@@ -783,7 +783,7 @@ void UL_indication(UL_IND_t *UL_info, void *proc) {
                     CC_id);
         ifi->schedule_response(sched_info, proc );
       }
-
+      
       LOG_D(PHY,"Schedule_response: SFN_SF:%d%d dl_pdus:%d\n",sched_info->frame,sched_info->subframe,sched_info->DL_req->dl_config_request_body.number_pdu);
     }
   }

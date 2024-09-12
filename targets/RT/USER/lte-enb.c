@@ -415,7 +415,7 @@ static void *L1_thread( void *param ) {
     LOG_D(PHY,"L1RX waiting for RU RX\n");
 
     if (wait_on_condition(&proc->mutex,&proc->cond,&proc->instance_cnt,thread_name)<0) break;
-
+    
     LOG_D(PHY,"L1RX starting in %d.%d\n",proc->frame_rx,proc->subframe_rx);
     VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_CPUID_ENB_THREAD_RXTX,sched_getcpu());
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_eNB_PROC_RXTX0, 1 );

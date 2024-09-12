@@ -2051,6 +2051,18 @@ int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req) {
   return retval;
 }
 
+int oai_nfapi_subframe_ind(nfapi_subframe_indication_t *subframe_ind) {
+  nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
+  subframe_ind->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around
+  subframe_ind->header.message_id = NFAPI_SUBFRAME_INDICATION;
+  //LOG_D(PHY, "[VNF] %s() SUBFRAME_IND sfn_sf:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(subframe_ind->sfn_sf));
+  int retval = nfapi_vnf_p7_subframe_ind(p7_config, subframe_ind);
+  if (retval!=0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  }
+  return retval;
+}
+
 int oai_nfapi_ul_config_req(nfapi_ul_config_request_t *ul_config_req) {
   nfapi_vnf_p7_config_t *p7_config = vnf.p7_vnfs[0].config;
   ul_config_req->header.phy_id = vnf.p7_vnfs[0].config->phy_id; // HACK TODO FIXME - need to pass this around!!!!
@@ -2108,6 +2120,7 @@ int oai_nfapi_ul_config_req(nfapi_ul_config_request_t *ul_config_req) {
 
   return retval;
 }
+
 
 int oai_nfapi_ue_release_req(nfapi_ue_release_request_t *release_req){
     if(release_req->ue_release_request_body.number_of_TLVs <= 0)
