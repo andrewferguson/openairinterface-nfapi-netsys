@@ -1042,11 +1042,13 @@ void schedule_response(Sched_Rsp_t *Sched_INFO, void *arg) {
   }
   if(NFAPI_MODE!=NFAPI_MONOLITHIC){
     // send subframe indication to PNF
-    LOG_D(PHY,"NFAPI: Sending subframe indication to PNF\n");
+    LOG_D(PHY,"NFAPI: Sending subframe indication to PNF \n");
     nfapi_subframe_indication_t *subframe_ind;
+    subframe_ind = (nfapi_subframe_indication_t *)malloc(sizeof(nfapi_subframe_indication_t));
+    memset(subframe_ind,0,sizeof(nfapi_subframe_indication_t));
     subframe_ind->header.message_id = NFAPI_SUBFRAME_INDICATION;
-    subframe_ind->header.phy_id = DL_req->header.phy_id;
-    subframe_ind->sfn_sf = DL_req->sfn_sf;
+    subframe_ind->header.phy_id = eNB->Mod_id;
+    subframe_ind->sfn_sf = 0;
     oai_nfapi_subframe_ind(subframe_ind);
 
   }
