@@ -449,17 +449,22 @@ x2ap_eNB_handle_x2_setup_request(instance_t instance,
        * eNB has not been found in list of associated eNB,
        * * * * Add it to the tail of list and initialize data
        */
+    X2AP_DEBUG("x2ap_eNB_data = x2ap_is_eNB_id_in_list (eNB_id)) == NULL is True\n");
     if ((x2ap_eNB_data = x2ap_is_eNB_assoc_id_in_list (assoc_id)) == NULL) {
+     X2AP_DEBUG("x2ap_eNB_data = x2ap_is_eNB_id_in_list (eNB_id)) == NULL is True this will return with -1 \n");
       /*
        * ??
        */
       return -1;
     } else {
+
       x2ap_eNB_data->state = X2AP_ENB_STATE_RESETTING;
       x2ap_eNB_data->eNB_id = eNB_id;
+     X2AP_DEBUG("x2ap_eNB_data->state = X2AP_ENB_STATE_RESETTING; x2ap_eNB_data->eNB_id = eNB_id; \n");
     }
   } else {
     x2ap_eNB_data->state = X2AP_ENB_STATE_RESETTING;
+   X2AP_DEBUG("x2ap_eNB_data->state = X2AP_ENB_STATE_RESETTING  eNB has been found in list, consider the x2 setup request as a reset connection \n");
     /*
      * eNB has been found in list, consider the x2 setup request as a reset connection,
      * * * * reseting any previous UE state if sctp association is != than the previous one
@@ -481,7 +486,7 @@ x2ap_eNB_handle_x2_setup_request(instance_t instance,
      * TODO: call the reset procedure
      */
   }
-
+   
   /* Set proper pci */
   X2AP_FIND_PROTOCOLIE_BY_ID(X2AP_X2SetupRequest_IEs_t, ie, x2SetupRequest,
                              X2AP_ProtocolIE_ID_id_ServedCells, true);
@@ -491,14 +496,15 @@ x2ap_eNB_handle_x2_setup_request(instance_t instance,
   }
 
   msg = itti_alloc_new_message(TASK_X2AP, 0, X2AP_SETUP_REQ);
-
+  printf("ie->value.choice.ServedCells.list.count :%d \n", ie->value.choice.ServedCells.list.count);
   X2AP_SETUP_REQ(msg).num_cc = ie->value.choice.ServedCells.list.count;
 
   if (ie->value.choice.ServedCells.list.count > 0) {
     x2ap_eNB_data->num_cc = ie->value.choice.ServedCells.list.count;
     for (int i=0; i<ie->value.choice.ServedCells.list.count;i++) {
-      servedCellMember = (ServedCells__Member *)ie->value.choice.ServedCells.list.array[i];
-      x2ap_eNB_data->Nid_cell[i] = servedCellMember->servedCellInfo.pCI;
+      servedCellMember = (ServedCells__Member *)ie->value.choice.ServedCells.list.array[i]; 
+     printf("servedCellMember->servedCellInfo.pCI; :%d \n", servedCellMember->servedCellInfo.pCI); 
+     x2ap_eNB_data->Nid_cell[i] = servedCellMember->servedCellInfo.pCI;
       X2AP_SETUP_REQ(msg).Nid_cell[i] = x2ap_eNB_data->Nid_cell[i];
     }
   }

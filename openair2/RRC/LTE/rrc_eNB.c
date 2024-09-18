@@ -4934,7 +4934,10 @@ check_handovers(
 {
   struct rrc_eNB_ue_context_s        *ue_context_p;
   RB_FOREACH(ue_context_p, rrc_ue_tree_s, &(RC.rrc[ctxt_pP->module_id]->rrc_ue_head)) {
+  LOG_D(RRC, "[eNB %d] Checking UE %x handover \n", ctxt_pP->module_id, ctxt_pP->rnti);
     ctxt_pP->rnti  = ue_context_p->ue_id_rnti;
+           if( ue_context_p->ue_context.handover_info != NULL)
+         LOG_D(RRC, "[eNB %d] check enb called ue_context_p->ue_context.handover_info->state %d \n", ctxt_pP->module_id, ue_context_p->ue_context.handover_info->state);
 
     if (ue_context_p->ue_context.StatusRrc == RRC_HO_EXECUTION && ue_context_p->ue_context.handover_info != NULL) {
       /* in the source, UE in HO_PREPARE mode */

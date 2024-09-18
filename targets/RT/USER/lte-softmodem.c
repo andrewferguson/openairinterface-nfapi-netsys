@@ -355,7 +355,7 @@ void wait_eNBs(void) {
 
   while (waiting==1) {
     printf("Waiting for eNB L1 instances to all get configured ... sleeping 50ms (nb_L1_inst %d)\n",RC.nb_L1_inst);
-    usleep(50*1000);
+    usleep(5*1000);
     waiting=0;
 
     for (i=0; i<RC.nb_L1_inst; i++) {
@@ -624,7 +624,7 @@ int main ( int argc, char **argv )
     pthread_cond_init(&sync_cond,NULL);
     pthread_mutex_init(&sync_mutex, NULL);
 
-    rt_sleep_ns(10*100000000ULL);
+    //rt_sleep_ns(1*100000000ULL);
 
     if (NFAPI_MODE!=NFAPI_MONOLITHIC) {
       LOG_I(ENB_APP,"NFAPI*** - mutex and cond created - will block shortly for completion of PNF connection\n");

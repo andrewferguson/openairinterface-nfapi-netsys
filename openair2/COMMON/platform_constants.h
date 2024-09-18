@@ -46,8 +46,8 @@
   #define NB_MODULES_MAX 128
   #define NB_NODE_MAX    128
 #else
-  #define NB_MODULES_MAX 32
-  #define NB_NODE_MAX    32
+  #define NB_MODULES_MAX 128
+  #define NB_NODE_MAX    128
 #endif
 
 #ifdef JUMBO_FRAME
@@ -75,8 +75,8 @@
       #define MAX_eNB                      2
       #define MAX_gNB                      2
     #else
-      #define MAX_MOBILES_PER_ENB         40
-      #define MAX_MOBILES_PER_ENB_NB_IoT  40
+      #define MAX_MOBILES_PER_ENB         128
+      #define MAX_MOBILES_PER_ENB_NB_IoT  128
       #define MAX_MOBILES_PER_GNB         16
       #define MAX_eNB                      2
       #define MAX_gNB                      2

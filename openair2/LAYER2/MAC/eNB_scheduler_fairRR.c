@@ -1516,6 +1516,7 @@ schedule_ue_spec_fairRR(module_id_t module_idP,
           UE_info->eNB_UE_stats[CC_id][UE_id].total_rbs_used_retx += nb_rb;
           UE_info->eNB_UE_stats[CC_id][UE_id].dlsch_mcs1 = eNB_UE_stats->dlsch_mcs1;
           UE_info->eNB_UE_stats[CC_id][UE_id].dlsch_mcs2 = eNB_UE_stats->dlsch_mcs1;
+          LOG_I(MAC, "retx[%d] RBS_USED : %d total_rbs_used : %d dlsch_mcs1 :  %d \n ", UE_id, nb_rb, UE_info->eNB_UE_stats[CC_id][UE_id].total_rbs_used_retx,  UE_info->eNB_UE_stats[CC_id][UE_id].dlsch_mcs1);
         } else {
           LOG_D(MAC,
                 "[eNB %d] Frame %d CC_id %d : don't schedule UE %d, its retransmission takes more resources than we have\n",
@@ -1962,7 +1963,7 @@ schedule_ue_spec_fairRR(module_id_t module_idP,
           UE_info->eNB_UE_stats[CC_id][UE_id].total_sdu_bytes+= sdu_length_total;
           UE_info->eNB_UE_stats[CC_id][UE_id].total_pdu_bytes+= TBS;
           UE_info->eNB_UE_stats[CC_id][UE_id].total_num_pdus+=1;
-
+           LOG_I(MAC, "DL[%d] RBS_USED : %d total_rbs_used : %d dlsch_mcs1 :  %d \n ",UE_id, nb_rb, UE_info->eNB_UE_stats[CC_id][UE_id].total_rbs_used, UE_info->eNB_UE_stats[CC_id][UE_id].dlsch_mcs1);
           if (cc[CC_id].tdd_Config != NULL) { // TDD
             UE_info->UE_template[CC_id][UE_id].DAI++;
             update_ul_dci(module_idP,CC_id,rnti,UE_info->UE_template[CC_id][UE_id].DAI,subframeP);
@@ -3221,6 +3222,7 @@ void schedule_ulsch_rnti_fairRR(module_id_t   module_idP,
         UE_template->TBS_UL[harq_pid] = get_TBS_UL(UE_template->mcs_UL[harq_pid],rb_table[rb_table_index]);
         UE_info->eNB_UE_stats[CC_id][UE_id].total_rbs_used_rx+=rb_table[rb_table_index];
         UE_info->eNB_UE_stats[CC_id][UE_id].ulsch_TBS=UE_template->TBS_UL[harq_pid];
+         LOG_I(MAC, "UL[%d] RBS_USED : %d total_rbs_used : %d ulsch_mcs1 : %d \n ", UE_id,rb_table[rb_table_index] ,UE_info->eNB_UE_stats[CC_id][UE_id].total_rbs_used_rx,UE_template->mcs_UL[harq_pid]);
         T(T_ENB_MAC_UE_UL_SCHEDULE, T_INT(module_idP), T_INT(CC_id), T_INT(rnti), T_INT(frameP),
           T_INT(subframeP), T_INT(harq_pid), T_INT(UE_template->mcs_UL[harq_pid]), T_INT(first_rb[CC_id]), T_INT(rb_table[rb_table_index]),
           T_INT(UE_template->TBS_UL[harq_pid]), T_INT(ndi));

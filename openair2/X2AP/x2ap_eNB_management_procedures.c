@@ -236,6 +236,7 @@ x2ap_eNB_data_t  * x2ap_is_eNB_id_in_list (const uint32_t eNB_id)
   return NULL;
 }
 
+/*
 x2ap_eNB_data_t  * x2ap_is_eNB_assoc_id_in_list (const uint32_t sctp_assoc_id)
 {
   x2ap_eNB_instance_t    *inst;
@@ -251,6 +252,20 @@ x2ap_eNB_data_t  * x2ap_is_eNB_assoc_id_in_list (const uint32_t sctp_assoc_id)
       if (found->assoc_id == sctp_assoc_id) {
 	return found;
       }
+    }
+  }
+  return NULL;
+}
+*/
+x2ap_eNB_data_t  * x2ap_is_eNB_assoc_id_in_list (const uint32_t sctp_assoc_id)
+{
+  x2ap_eNB_instance_t    *inst;
+  struct x2ap_eNB_data_s *elm;
+
+  STAILQ_FOREACH(inst, &x2ap_eNB_internal_data.x2ap_eNB_instances_head, x2ap_eNB_entries) {
+    RB_FOREACH(elm, x2ap_enb_map, &inst->x2ap_enb_head) {
+      if (elm->assoc_id == sctp_assoc_id)
+        return elm;
     }
   }
   return NULL;
