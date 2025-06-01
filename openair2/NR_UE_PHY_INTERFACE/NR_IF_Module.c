@@ -51,7 +51,7 @@
 #define MAX_IF_MODULES 100
 
 UL_IND_t *UL_INFO = NULL;
-
+extern uint8_t start_gnb_id;
 static eth_params_t         stub_eth_params;
 static nr_ue_if_module_t *nr_ue_if_module_inst[MAX_IF_MODULES];
 static int ue_tx_sock_descriptor = -1;
@@ -66,10 +66,11 @@ queue_t nr_tx_req_queue;
 queue_t nr_ul_dci_req_queue;
 queue_t nr_ul_tti_req_queue;
 pthread_mutex_t mac_IF_mutex;
-
+ 
 void nrue_init_standalone_socket(int tx_port, int rx_port)
 {
-  {
+  struct sockaddr_in pnf_addr;
+  { 
     struct sockaddr_in server_address;
     int addr_len = sizeof(server_address);
     memset(&server_address, 0, addr_len);
@@ -89,7 +90,6 @@ void nrue_init_standalone_socket(int tx_port, int rx_port)
       close(sd);
       return;
     }
-
     // Using connect to use send() instead of sendto()
     if (connect(sd, (struct sockaddr *)&server_address, addr_len) < 0)
     {
@@ -100,6 +100,10 @@ void nrue_init_standalone_socket(int tx_port, int rx_port)
     assert(ue_tx_sock_descriptor == -1);
     ue_tx_sock_descriptor = sd;
     LOG_T(NR_RRC, "Successfully set up tx_socket in %s.\n", __FUNCTION__);
+
+        /* Store Proxy (PNF) address */
+    memcpy((uint8_t *) &pnf_addr, (uint8_t *) &server_address, addr_len);
+    pnf_addr.sin_port = htons(rx_port); /* We asume that the proxy uses the rx_port to send traffic to this UE (port rx_port) */
   }
 
   {
@@ -126,11 +130,22 @@ void nrue_init_standalone_socket(int tx_port, int rx_port)
     assert(ue_rx_sock_descriptor == -1);
     ue_rx_sock_descriptor = sd;
     LOG_T(NR_RRC, "Successfully set up rx_socket in %s.\n", __FUNCTION__);
+        /* Send discovery packet to proxy from the rx socket */
+    send_nr_discovery_packet_to_proxy(ue_rx_sock_descriptor, pnf_addr);
   }
   LOG_D(NR_RRC, "NRUE standalone socket info: tx_port %d  rx_port %d on %s.\n",
         tx_port, rx_port, stub_eth_params.remote_addr);
 }
-
+void send_nr_discovery_packet_to_proxy(int sock, struct sockaddr_in pnf_addr)
+{
+  int addr_len = sizeof(pnf_addr);
+  uint16_t discovery[1] = {0};
+  discovery[0] = start_gnb_id;
+  printf("Ujjwal: start -> %d\n",start_gnb_id);
+  sendto(sock, &discovery, 2, 0, (struct sockaddr *)&pnf_addr, addr_len);
+  return;
+}
+ 
 void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
 {
   switch(msg_id)
@@ -977,7 +992,6 @@ void *nrue_standalone_pnf_task(void *context)
 
       LOG_D(NR_PHY, "Received from proxy sfn %d slot %d\n",
             NFAPI_SFNSLOT2SFN(*sfn_slot), NFAPI_SFNSLOT2SLOT(*sfn_slot));
-
       if (!put_queue(&nr_sfn_slot_queue, sfn_slot))
       {
         LOG_E(NR_PHY, "put_queue failed for sfn slot.\n");
@@ -1249,6 +1263,8 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
   pthread_mutex_unlock(&mac_IF_mutex);
   return ret_mask;
 }
+
+
 
 nr_ue_if_module_t *nr_ue_if_module_init(uint32_t module_id)
 {

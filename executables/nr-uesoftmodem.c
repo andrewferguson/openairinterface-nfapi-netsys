@@ -90,7 +90,8 @@ unsigned short config_frames[4] = {2,9,11,13};
 extern const char *duplex_mode[];
 THREAD_STRUCT thread_struct;
 nrUE_params_t nrUE_params;
-
+uint16_t ue_id_kube;
+uint8_t start_gnb_id; 
 // Thread variables
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
@@ -454,6 +455,8 @@ configmodule_interface_t *uniqCfg = NULL;
 ldpc_interface_t ldpc_interface = {0}, ldpc_interface_offload = {0};
 
 int main( int argc, char **argv ) {
+  ue_id_kube = atoi(argv[argc-1]);
+  start_gnb_id = ue_id_kube ;
   int set_exe_prio = 1;
   if (checkIfFedoraDistribution())
     if (checkIfGenericKernelOnFedora())

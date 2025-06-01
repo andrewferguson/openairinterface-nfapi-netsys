@@ -81,7 +81,7 @@ typedef struct {
   int            no_timing_correction;
   int            nb_antennas_rx;
   int            nb_antennas_tx;
-  int            threequarter_fs;
+  int            threequarter_fs; 
   int            N_RB_DL;
   int            ssb_start_subcarrier;
 } nrUE_params_t;
@@ -101,4 +101,5 @@ void start_oai_nrue_threads(void);
 void *UE_thread(void *arg);
 void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id, uint8_t abstraction_flag);
 void init_nrUE_standalone_thread(int ue_idx);
+extern uint8_t start_gnb_id;
 #endif
