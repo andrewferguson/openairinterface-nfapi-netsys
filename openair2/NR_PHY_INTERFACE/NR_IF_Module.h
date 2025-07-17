@@ -77,6 +77,8 @@ typedef struct {
   /// UCI indication
   nfapi_nr_uci_indication_t uci_ind;
 
+  nfapi_nr_slot_indication_scf_t slot_ind;
+
 } NR_UL_IND_t;
 
 // Downlink slot P7

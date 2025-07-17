@@ -22,7 +22,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-static nfapi_trace_level_t trace_level = NFAPI_TRACE_WARN;
+static nfapi_trace_level_t trace_level = NFAPI_TRACE_DEBUG;
 
 static void nfapi_trace_init(void)
 {

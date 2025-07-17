@@ -232,6 +232,26 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     }
     case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
     break;
+    case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
+    {
+        char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
+        LOG_T(NR_MAC, "Slot header id :%d\n", UL_INFO->slot_ind.header.message_id);
+        int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->slot_ind, buffer, sizeof(buffer), NULL);
+        if (encoded_size <= 0)
+        {
+                LOG_E(NR_MAC, "nfapi_nr_p7_message_pack has failed. Encoded size = %d\n", encoded_size);
+                return;
+        }
+
+        LOG_D(NR_MAC, "NR_SLOT_IND sent to Proxy, Size: %d Frame %d Slot %d\n", encoded_size,
+                UL_INFO->slot_ind.sfn, UL_INFO->slot_ind.slot);
+        if (send(ue_tx_sock_descriptor, buffer, encoded_size, 0) < 0)
+        {
+                LOG_E(NR_MAC, "Send Proxy NR_UE failed\n");
+                return;
+        }
+        break;
+    }
     default:
     break;
   }
@@ -289,7 +309,10 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
     {
       nfapi_nr_ul_tti_request_t *ind = candidate;
-      return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
+      if(NFAPI_SFNSLOT2SFN(sfn_sf) == -1 )
+        return false; // Match all SFN/SLOTs if SFN is -1 (used for NSA mode)
+      else
+        return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
     }
 
     default:
@@ -745,6 +768,7 @@ void check_and_process_dci(nfapi_nr_dl_tti_request_t *dl_tti_request,
     }
 
     if (dl_tti_request || tx_data_request || ul_dci_request) {
+      
       fapi_nr_dl_config_request_t *dl_config = get_dl_config_request(mac, slot);
       fill_dci_from_dl_config(&mac->dl_info, dl_config);
     }
@@ -885,6 +909,8 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 LOG_E(NR_PHY, "Message ul_tti_request failed to unpack\n");
                 break;
             }
+            LOG_I(NR_PHY, "Ul tti request queue size %d. \n",
+                        nr_ul_tti_req_queue.num_items);
             /* We are filtering UL_TTI_REQs below. We only care about UL_TTI_REQs that
                will trigger sending a ul_harq (CRC/RX pair). This UL_TTI_REQ will have
                NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE. If we have not yet completed the CBRA/
@@ -894,7 +920,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                     mac->ra.ra_state >= RA_SUCCEEDED) {
                     if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
                     {
-                        LOG_D(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
+                        LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
                         nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = put_queue_replace(&nr_ul_tti_req_queue, ul_tti_request);
                         free(evicted_ul_tti_req);
                     }
@@ -903,7 +929,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 else if (mac->ra.ra_state < RA_SUCCEEDED) {
                     if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
                     {
-                        LOG_D(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
+                        LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
                         nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = put_queue_replace(&nr_ul_tti_req_queue, ul_tti_request);
                         free(evicted_ul_tti_req);
                     }
@@ -985,13 +1011,13 @@ void *nrue_standalone_pnf_task(void *context)
       LOG_E(NR_PHY, "%s(%d). Message truncated. %zd\n", __FUNCTION__, __LINE__, len);
       continue;
     }
-    if (len == sizeof(uint16_t))
+    if (len == sizeof(sfn_slot_info_t))
     {
-      uint16_t *sfn_slot = CALLOC(1, sizeof(*sfn_slot));
-      memcpy(sfn_slot, buffer, sizeof(*sfn_slot));
+      sfn_slot_info_t sfn_slot_info;
+      memcpy(&sfn_slot_info, buffer, sizeof(sfn_slot_info_t));
 
-      LOG_D(NR_PHY, "Received from proxy sfn %d slot %d\n",
-            NFAPI_SFNSLOT2SFN(*sfn_slot), NFAPI_SFNSLOT2SLOT(*sfn_slot));
+      uint16_t *sfn_slot = CALLOC(1, sizeof(*sfn_slot));
+      *sfn_slot =  sfn_slot_info.sfn_slot;
       if (!put_queue(&nr_sfn_slot_queue, sfn_slot))
       {
         LOG_E(NR_PHY, "put_queue failed for sfn slot.\n");
@@ -1040,6 +1066,7 @@ void *nrue_standalone_pnf_task(void *context)
         LOG_E(NR_PHY, "Header unpack failed for nrue_standalone pnf\n");
         continue;
       }
+      
       enqueue_nr_nfapi_msg(buffer, len, header);
     }
   } //while(true)
@@ -1162,9 +1189,12 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
   pthread_mutex_lock(&mac_IF_mutex);
   uint32_t ret_mask = 0x0;
   module_id_t module_id = dl_info->module_id;
+  LOG_D(NR_MAC, "In %s():%d module_id %d, frame %d, slot %d\n",
+        __FUNCTION__, __LINE__, module_id, dl_info->frame, dl_info->slot);
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   if ((!dl_info->dci_ind && !dl_info->rx_ind)) {
     // UL indication to schedule DCI reception
+    LOG_D(NR_MAC, "No DCI or RX indication, scheduling DCI reception\n");
     nr_ue_dl_scheduler(dl_info);
   } else {
     // UL indication after reception of DCI or DL PDU
@@ -1195,6 +1225,7 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
         ret_mask |= (ret << FAPI_NR_DCI_IND);
         AssertFatal( nr_ue_if_module_inst[module_id] != NULL, "IF module is NULL!\n" );
         AssertFatal( nr_ue_if_module_inst[module_id]->scheduled_response != NULL, "scheduled_response is NULL!\n" );
+        LOG_I(NR_MAC, "Calling get_dl_config_req %d\n", g_harq_pid);
         fapi_nr_dl_config_request_t *dl_config = get_dl_config_request(mac, dl_info->slot);
         fill_scheduled_response(&scheduled_response, dl_config, NULL, NULL, dl_info->module_id, dl_info->cc_id, dl_info->frame, dl_info->slot, dl_info->phy_data);
         nr_ue_if_module_inst[module_id]->scheduled_response(&scheduled_response);

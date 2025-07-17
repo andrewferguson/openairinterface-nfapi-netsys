@@ -87,7 +87,12 @@ typedef struct {
     void *phy_data;
 } nr_downlink_indication_t;
 
-
+typedef struct sfn_slot_info_s
+    {
+        uint16_t phy_id;
+        uint16_t sfn_slot;
+    } sfn_slot_info_t;
+    
 typedef struct {
     /// module id
     module_id_t module_id;

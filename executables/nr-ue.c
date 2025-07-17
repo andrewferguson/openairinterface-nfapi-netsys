@@ -307,7 +307,11 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       nr_ue_dl_indication(&mac->dl_info);
       process_queued_nr_nfapi_msgs(mac, sfn_slot);
     }
-
+    else{
+      LOG_D(NR_MAC, "SA %d MIB %p\n",
+            get_softmodem_params()->sa, mac->mib);
+      LOG_D(NR_MAC, "We have received MIB\n");
+    }
     int CC_id = 0;
     uint8_t gNB_id = 0;
     nr_uplink_indication_t ul_info;
@@ -350,8 +354,22 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       LOG_D(NR_MAC, "Slot %d. calling nr_ue_ul_ind()\n", ul_info.slot_tx);
       nr_ue_ul_scheduler(&ul_info);
     }
+    LOG_D(NR_MAC, "Slot %d. Calling nr_ue_ul_indication()\n", ul_info.slot_rx);
     process_queued_nr_nfapi_msgs(mac, sfn_slot);
+    // send NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION back to PNF
+
+    NR_UL_IND_t *ul_slot_ind ;
+    ul_slot_ind = malloc(sizeof(NR_UL_IND_t));
+    memset(ul_slot_ind, 0, sizeof(NR_UL_IND_t));
+    ul_slot_ind->slot_ind.header.message_id = NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION;
+    ul_slot_ind->slot_ind.slot= slot;
+    ul_slot_ind->slot_ind.sfn = frame;
+
+    send_nsa_standalone_msg(ul_slot_ind, NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION);
+    free_and_zero(ul_slot_ind);
+    LOG_D(NR_MAC, "Exiting NRUE_phy_stub_standalone_pnf_task\n");
   }
+  
   return NULL;
 }
 

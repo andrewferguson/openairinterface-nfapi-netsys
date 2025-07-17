@@ -947,6 +947,8 @@ void nr_ue_dl_scheduler(nr_downlink_indication_t *dl_info)
   frame_t rx_frame      = dl_info->frame;
   slot_t rx_slot        = dl_info->slot;
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
+  LOG_D(NR_MAC, "mac id %d : ue sync status %d \n ", mod_id,  mac->state);
+  
 
   fapi_nr_dl_config_request_t *dl_config = get_dl_config_request(mac, rx_slot);
   dl_config->sfn  = rx_frame;
@@ -954,7 +956,6 @@ void nr_ue_dl_scheduler(nr_downlink_indication_t *dl_info)
 
   nr_scheduled_response_t scheduled_response;
   nr_dcireq_t dcireq;
-
   if(mac->state > UE_NOT_SYNC) {
 
     dcireq.module_id = mod_id;

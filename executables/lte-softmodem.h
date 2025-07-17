@@ -125,6 +125,7 @@ extern pthread_mutex_t sync_mutex;
 extern int sync_var;
 
 extern uint16_t ue_id_g;
+extern uint16_t ue_proxy_id;
 extern uint16_t node_number;
 
 extern uint64_t downlink_frequency[MAX_NUM_CCs][4];

@@ -92,6 +92,7 @@ THREAD_STRUCT thread_struct;
 nrUE_params_t nrUE_params;
 uint16_t ue_id_kube;
 uint8_t start_gnb_id; 
+uint16_t ue_proxy_id; // used for UE proxy, not for NR UE
 // Thread variables
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
@@ -445,7 +446,7 @@ void start_oai_nrue_threads()
       abort();
     }
 
-    init_nrUE_standalone_thread(ue_id_g);
+    init_nrUE_standalone_thread(ue_proxy_id);
 }
 
 int NB_UE_INST = 1;
@@ -456,6 +457,9 @@ ldpc_interface_t ldpc_interface = {0}, ldpc_interface_offload = {0};
 
 int main( int argc, char **argv ) {
   ue_id_kube = atoi(argv[argc-1]);
+  argc--;
+  ue_proxy_id = atoi(argv[argc-1]);
+  argc--;
   start_gnb_id = ue_id_kube ;
   int set_exe_prio = 1;
   if (checkIfFedoraDistribution())
