@@ -1,7 +1,3 @@
-UE 0 CU UE ID 2 DU UE ID 11745 RNTI 2de1 random identity 00000001f8000000 S-TMSI 0:
-    RRC status inactive
-    (no PDU sessions)
-    associated DU:  (local/integrated CU-DU)
 
 1 connected DUs 
-[1] DU ID 1 (gNB-OAI) integrated DU-CU: nrCellID 12345678, PCI 0
+[1] DU ID 0 (gNB-OAI) integrated DU-CU: nrCellID 12345678, PCI 0

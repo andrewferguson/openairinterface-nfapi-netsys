@@ -1,10 +1,2 @@
 
-E RNTI 2de1 (1) PH 0 dB PCMAX 0 dBm, average RSRP -44 (10 meas)
-UE 2de1: dlsch_rounds 392/0/0/0, dlsch_errors 0, pucch0_DTX 0, BLER 0.00000 MCS 9
-UE 2de1: dlsch_total_bytes 48795
-UE 2de1: ulsch_rounds 364/0/0/0, ulsch_DTX 0, ulsch_errors 0, BLER 0.00000 MCS 9
-UE 2de1: ulsch_total_bytes_scheduled 41954, ulsch_total_bytes_received 41954
-UE 2de1: LCID 1: TX           2133 RX            291 bytes
-UE 2de1: LCID 2: TX              0 RX              0 bytes
-UE 2de1: LCID 4: TX             15 RX            270 bytes
-
+                     Name                      Total                 Per Trials                 Num Trials                 CPU_F_GHz 2.100210
