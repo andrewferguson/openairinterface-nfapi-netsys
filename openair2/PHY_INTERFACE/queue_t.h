@@ -31,7 +31,7 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#define MAX_QUEUE_SIZE 512
+#define MAX_QUEUE_SIZE 5120
 
 typedef struct queue_t
 {
