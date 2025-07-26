@@ -293,7 +293,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     frame_t frame = NFAPI_SFNSLOT2SFN(sfn_slot);
     int slot = NFAPI_SFNSLOT2SLOT(sfn_slot);
     if (sfn_slot == last_sfn_slot) {
-      LOG_D(NR_MAC, "repeated sfn_sf = %d.%d\n",
+      LOG_I(NR_MAC, "repeated sfn_sf = %d.%d\n",
             frame, slot);
       continue;
     }
@@ -316,7 +316,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     uint8_t gNB_id = 0;
     nr_uplink_indication_t ul_info;
     int slots_per_frame = 20; //30 kHZ subcarrier spacing
-    int slot_ahead = 6; // TODO: Make this dynamic
+    int slot_ahead = 0; // TODO: Make this dynamic
     ul_info.cc_id = CC_id;
     ul_info.gNB_index = gNB_id;
     ul_info.module_id = mod_id;
