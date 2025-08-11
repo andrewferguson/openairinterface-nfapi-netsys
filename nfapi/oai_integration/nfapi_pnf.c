@@ -1039,6 +1039,7 @@ int nr_config_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, n
   if (req->carrier_config.dl_bandwidth.tl.tag == NFAPI_NR_CONFIG_DL_BANDWIDTH_TAG) {
     phy_info->dl_channel_bw_support = req->carrier_config.dl_bandwidth.value; // rf_config.dl_channel_bandwidth.value;
     fp->N_RB_DL = req->carrier_config.dl_bandwidth.value; // rf_config.dl_channel_bandwidth.value;
+    printf("[PNF] DL Bandwidth tag:%d value:%d\n", req->carrier_config.dl_bandwidth.tl.tag, fp->N_RB_DL);
     num_tlv++;
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s() NFAPI_NR_CONFIG_DL_BANDWIDTH_TAG N_RB_DL:%u\n", __FUNCTION__, fp->N_RB_DL);
   } else {

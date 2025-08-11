@@ -426,7 +426,7 @@ void nr_decode_pucch0(PHY_VARS_gNB *gNB,
     uci_pdu->harq.harq_confidence_level = no_conf;
     uci_pdu->harq.harq_list[0].harq_value = !(index&0x01);
     LOG_D(PHY,
-          "[DLSCH/PDSCH/PUCCH] %d.%d HARQ %s with confidence level %s xrt_mag %d xrt_mag_next %d pucch_power_dBtimes10 %d n0 %d (%d,%d) pucch0_thres %d, "
+          "in pucch_rx [DLSCH/PDSCH/PUCCH] %d.%d HARQ %s with confidence level %s xrt_mag %d xrt_mag_next %d pucch_power_dBtimes10 %d n0 %d (%d,%d) pucch0_thres %d, "
           "cqi %d, SNRtimes10 %d, energy %f\n",
           frame,
           slot,
@@ -459,8 +459,8 @@ void nr_decode_pucch0(PHY_VARS_gNB *gNB,
 
     uci_pdu->harq.harq_list[1].harq_value = !(index&0x01);
     uci_pdu->harq.harq_list[0].harq_value = !((index>>1)&0x01);
-    LOG_D(PHY,
-          "[DLSCH/PDSCH/PUCCH] %d.%d HARQ values (%s, %s) with confidence level %s, xrt_mag %d xrt_mag_next %d pucch_power_dBtimes10 %d n0 %d (%d,%d) "
+    LOG_I(PHY,
+          "In pucch_rx [DLSCH/PDSCH/PUCCH] %d.%d HARQ values (%s, %s) with confidence level %s, xrt_mag %d xrt_mag_next %d pucch_power_dBtimes10 %d n0 %d (%d,%d) "
           "pucch0_thres %d, cqi %d, SNRtimes10 %d\n",
           frame,
           slot,

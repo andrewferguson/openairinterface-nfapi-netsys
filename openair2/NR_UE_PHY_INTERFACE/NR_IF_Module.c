@@ -991,6 +991,7 @@ void *nrue_standalone_pnf_task(void *context)
     }
     else if (get_message_id((const uint8_t *)buffer, len) == 0x0FFF) // 0x0FFF : channel info identifier.
     {
+      //printf("Received channel info message with length %zd\n", len);
       nr_phy_channel_params_t *ch_info = CALLOC(1, sizeof(*ch_info));
       memcpy(ch_info, buffer, sizeof(*ch_info));
 

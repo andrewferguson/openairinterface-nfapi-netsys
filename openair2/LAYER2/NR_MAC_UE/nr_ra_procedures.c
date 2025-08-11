@@ -520,7 +520,7 @@ void set_ra_rnti(NR_UE_MAC_INST_t *mac, fapi_nr_ul_config_prach_pdu *prach_pdu){
 
   ra->ra_rnti = 1 + s_id + 14 * t_id + 1120 * f_id + 8960 * ul_carrier_id;
 
-  LOG_D(MAC, "Computed ra_RNTI is %x \n", ra->ra_rnti);
+  LOG_I(NR_MAC, "Computed ra_RNTI is %x \n", ra->ra_rnti);
 }
 
 // This routine implements Section 5.1.2 (UE Random Access Resource Selection)

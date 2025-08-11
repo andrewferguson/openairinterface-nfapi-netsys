@@ -1215,28 +1215,14 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id,
       return;
     }
 
-    uint64_t s_tmsi_part1 = bitStr_to_uint64(&rrcSetupRequest->ue_Identity.choice.ng_5G_S_TMSI_Part1);
+    uint64_t s_tmsi_part1 = BIT_STRING_to_uint64(&rrcSetupRequest->ue_Identity.choice.ng_5G_S_TMSI_Part1);
+    LOG_I(NR_RRC, "Received UE 5G-S-TMSI-Part1 %ld\n", s_tmsi_part1);
 
-    // memcpy(((uint8_t *) & random_value) + 3,
-    //         rrcSetupRequest->ue_Identity.choice.ng_5G_S_TMSI_Part1.buf,
-    //         rrcSetupRequest->ue_Identity.choice.ng_5G_S_TMSI_Part1.size);
-
-    if ((ue_context_p = rrc_gNB_ue_context_5g_s_tmsi_exist(rrc, s_tmsi_part1))) {
-      gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-      LOG_I(NR_RRC, " 5G-S-TMSI-Part1 exists, old rnti %04x => %04x\n", UE->rnti, msg->crnti);
-      AssertFatal(false, "not implemented\n");
-
-      /* replace rnti in the context */
-      UE->rnti = msg->crnti;
-    } else {
-      LOG_I(NR_RRC, "UE %04x 5G-S-TMSI-Part1 doesn't exist, setting ng_5G_S_TMSI_Part1 => %ld\n", msg->crnti, s_tmsi_part1);
-
-      ue_context_p = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, s_tmsi_part1, msg->gNB_DU_ue_id);
-      AssertFatal(ue_context_p != NULL, "out of memory\n");
-      gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-      UE->Initialue_identity_5g_s_TMSI.presence = true;
-      UE->ng_5G_S_TMSI_Part1 = s_tmsi_part1;
-    }
+    ue_context_p = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, s_tmsi_part1, msg->gNB_DU_ue_id);
+    AssertFatal(ue_context_p != NULL, "out of memory\n");
+    gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+    UE->Initialue_identity_5g_s_TMSI.presence = true;
+    UE->ng_5G_S_TMSI_Part1 = s_tmsi_part1;
   } else {
     uint64_t random_value = 0;
     memcpy(((uint8_t *)&random_value) + 3,
@@ -1245,8 +1231,11 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id,
 
     ue_context_p = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
     LOG_E(NR_RRC, "RRCSetupRequest without random UE identity or S-TMSI not supported, let's reject the UE %04x\n", msg->crnti);
-    rrc_gNB_generate_RRCReject(0, ue_context_p);
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
     return;
+
+
+
   }
 
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;

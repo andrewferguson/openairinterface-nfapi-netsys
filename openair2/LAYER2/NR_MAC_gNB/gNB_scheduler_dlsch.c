@@ -94,6 +94,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
   if (drx_cmd != 255) {
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_DRX;
+    //printf("DL_SCH_LCID_DRX\n");
     //last_size = 1;
     mac_pdu_ptr++;
   }
@@ -106,6 +107,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
   if (ue_sched_ctl->ta_apply) {
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_TA_COMMAND;
+    //printf("DL_SCH_LCID_TA_COMMAND\n");
     //last_size = 1;
     mac_pdu_ptr++;
     // TA MAC CE (1 octet)
@@ -128,6 +130,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
   if (ue_cont_res_id) {
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_CON_RES_ID;
+    //printf("DL_SCH_LCID_CON_RES_ID\n");
     mac_pdu_ptr++;
     //last_size = 1;
     // contention resolution identity MAC ce has a fixed 48 bit size
@@ -150,6 +153,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
     //filling subheader
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_TCI_STATE_IND_UE_SPEC_PDCCH;
+    //printf("DL_SCH_LCID_TCI_STATE_IND_UE_SPEC_PDCCH\n");
     mac_pdu_ptr++;
     //Creating the instance of CE structure
     NR_TCI_PDCCH  nr_UESpec_TCI_StateInd_PDCCH;
@@ -171,6 +175,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
     //filling the subheader
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_SP_CSI_REP_PUCCH_ACT;
+   // printf("DL_SCH_LCID_SP_CSI_REP_PUCCH_ACT\n");
     mac_pdu_ptr++;
     //creating the instance of CE structure
     NR_PUCCH_CSI_REPORTING nr_PUCCH_CSI_reportingActDeact;
@@ -198,6 +203,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->R = 0;
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->F = 0;
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->LCID = DL_SCH_LCID_TCI_STATE_ACT_UE_SPEC_PDSCH;
+   // printf("DL_SCH_LCID_TCI_STATE_ACT_UE_SPEC_PDSCH\n");
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->L = sizeof(NR_TCI_PDSCH_APERIODIC_CSI) + num_octects * sizeof(uint8_t);
     last_size = 2;
     //Incrementing the PDU pointer
@@ -233,6 +239,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->R = 0;
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->F = 0;
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->LCID = DL_SCH_LCID_APERIODIC_CSI_TRI_STATE_SUBSEL;
+   // printf("DL_SCH_LCID_APERIODIC_CSI_TRI_STATE_SUBSEL\n");
     ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_ptr)->L = sizeof(NR_TCI_PDSCH_APERIODIC_CSI) + num_octects * sizeof(uint8_t);
     last_size = 2;
     //Incrementing the PDU pointer
@@ -263,6 +270,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
   if (ue_sched_ctl->UE_mac_ce_ctrl.sp_zp_csi_rs.is_scheduled) {
     ((NR_MAC_SUBHEADER_FIXED *) mac_pdu_ptr)->R = 0;
     ((NR_MAC_SUBHEADER_FIXED *) mac_pdu_ptr)->LCID = DL_SCH_LCID_SP_ZP_CSI_RS_RES_SET_ACT;
+   // printf("DL_SCH_LCID_SP_ZP_CSI_RS_RES_SET_ACT\n");
     mac_pdu_ptr++;
     ((NR_MAC_CE_SP_ZP_CSI_RS_RES_SET *) mac_pdu_ptr)->A_D = ue_sched_ctl->UE_mac_ce_ctrl.sp_zp_csi_rs.act_deact;
     ((NR_MAC_CE_SP_ZP_CSI_RS_RES_SET *) mac_pdu_ptr)->CELLID = ue_sched_ctl->UE_mac_ce_ctrl.sp_zp_csi_rs.serv_cell_id & 0x1F; //5 bits
@@ -278,6 +286,7 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
   if (ue_sched_ctl->UE_mac_ce_ctrl.csi_im.is_scheduled) {
     mac_pdu_ptr->R = 0;
     mac_pdu_ptr->LCID = DL_SCH_LCID_SP_CSI_RS_CSI_IM_RES_SET_ACT;
+   // printf("DL_SCH_LCID_SP_CSI_RS_CSI_IM_RES_SET_ACT\n");
     mac_pdu_ptr++;
     CSI_RS_CSI_IM_ACT_DEACT_MAC_CE csi_rs_im_act_deact_ce;
     csi_rs_im_act_deact_ce.A_D = ue_sched_ctl->UE_mac_ce_ctrl.csi_im.act_deact;
@@ -328,7 +337,7 @@ static void nr_store_dlsch_buffer(module_id_t module_id, frame_t frame, sub_fram
     for (int i = 0; i < sched_ctrl->dl_lc_num; ++i) {
       const int lcid = sched_ctrl->dl_lc_ids[i];
       const uint16_t rnti = UE->rnti;
-      LOG_D(NR_MAC, "In %s: UE %x: LCID %d\n", __FUNCTION__, rnti, lcid);
+      //LOG_I(NR_MAC, "In %s: UE %x: LCID %d\n", __FUNCTION__, rnti, lcid);
       if (lcid == DL_SCH_LCID_DTCH && sched_ctrl->rrc_processing_timer > 0) {
         continue;
       }
@@ -597,7 +606,7 @@ static void pf_dl(module_id_t module_id,
   int remainUEs = max_num_ue;
   int curUE = 0;
   int CC_id = 0;
-
+  // printf("[%d.%d] calling pf dl \n", frame, slot );
   /* Loop UE_info->list to check retransmission */
   UE_iterator(UE_list, UE) {
     if (UE->Msg4_ACKed != true)
@@ -606,9 +615,10 @@ static void pf_dl(module_id_t module_id,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_UE_DL_BWP_t *current_BWP = &UE->current_DL_BWP;
 
-    if (sched_ctrl->ul_failure)
+    if (sched_ctrl->ul_failure){
+      printf("[%d.%d] Skipping UE cause UL failure \n", frame, slot);
       continue;
-
+    }
     const NR_mac_dir_stats_t *stats = &UE->mac_stats.dl;
     NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
     /* get the PID of a HARQ process awaiting retrnasmission, or -1 otherwise */
@@ -618,8 +628,10 @@ static void pf_dl(module_id_t module_id,
     const uint32_t b = UE->mac_stats.dl.current_bytes;
     UE->dl_thr_ue = (1 - a) * UE->dl_thr_ue + a * b;
 
-    if (remainUEs == 0)
+    if (remainUEs == 0){
+      printf("[%d.%d] No remaining UEs to schedule\n", frame, slot);
       continue;
+    }
 
     /* retransmission */
     if (sched_pdsch->dl_harq_pid >= 0) {
@@ -631,27 +643,33 @@ static void pf_dl(module_id_t module_id,
               UE->rnti,
               frame,
               slot);
+        // printf("[%d.%d] DL retransmission could not be allocated \n", frame, slot);
         continue;
       }
+
       /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
       remainUEs--;
 
     } else {
       /* skip this UE if there are no free HARQ processes. This can happen e.g.
-       * if the UE disconnected in L2sim, in which case the gNB is not notified
+       * if the UE disconnected in L2sim  , in which case the gNB is not notified
        * (this can be considered a design flaw) */
       if (sched_ctrl->available_dl_harq.head < 0) {
         LOG_D(NR_MAC, "[UE %04x][%4d.%2d] UE has no free DL HARQ process, skipping\n",
               UE->rnti,
               frame,
               slot);
+        //  printf("[%d.%d] Skipping UE has no free DL HARQ process \n", frame, slot);
         continue;
-      }
+      }     
+       
 
       /* Check DL buffer and skip this UE if no bytes and no TA necessary */
-      if (sched_ctrl->num_total_bytes == 0 && frame != (sched_ctrl->ta_frame + 10) % 1024)
+      if (sched_ctrl->num_total_bytes == 0 && frame != (sched_ctrl->ta_frame + 10) % 1024){
+        //  printf("[%d.%d] Skipping UE cause buffer is empty \n", frame, slot);
         continue;
-
+      }
+   
       /* Calculate coeff */
       const NR_bler_options_t *bo = &mac->dl_bler;
       const int max_mcs_table = current_BWP->mcsTableIdx == 1 ? 27 : 28;
@@ -709,6 +727,7 @@ static void pf_dl(module_id_t module_id,
             frame,
             slot);
       iterator++;
+      // printf("[%d.%d] Skipping UE has no free DL HARQ process \n", frame, slot);
       continue;
     }
 
@@ -725,6 +744,7 @@ static void pf_dl(module_id_t module_id,
             frame,
             slot);
       iterator++;
+      // printf("[%d.%d] could not find free CCE for DL DCI \n", frame, slot);
       continue;
     }
 
@@ -732,6 +752,7 @@ static void pf_dl(module_id_t module_id,
     * allocation after CCE alloc fail would be more complex) */
 
     int r_pucch = nr_get_pucch_resource(sched_ctrl->coreset, ul_bwp->pucch_Config, CCEIndex);
+    // printf("[%d.%d] PUCCH resource is %d\n", frame, slot, r_pucch);
     const int alloc = nr_acknack_scheduling(mac, iterator->UE, frame, slot, r_pucch, 0);
 
     if (alloc<0) {
@@ -740,6 +761,7 @@ static void pf_dl(module_id_t module_id,
             frame,
             slot);
       iterator++;
+      // printf("[%d.%d] could not find PUCCH for DL DCI \n", frame, slot);
       continue;
     }
 
@@ -817,6 +839,7 @@ static void pf_dl(module_id_t module_id,
 
 static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
 {
+  
   NR_UEs_t *UE_info = &RC.nrmac[module_id]->UE_info;
 
   if (UE_info->list[0] == NULL)
@@ -914,7 +937,6 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
   if (!is_xlsch_in_slot(gNB_mac->dlsch_slot_bitmap[slot / 64], slot))
     return;
-
   /* PREPROCESSOR */
   gNB_mac->pre_processor_dl(module_id, frame, slot);
   const int CC_id = 0;
@@ -944,7 +966,9 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
     if (sched_pdsch->rbSize <= 0)
       continue;
-
+    else{
+      // printf("[%d.%d]gNB dlsch scheduler sched_pdsch->rbSize %d  \n", frame, slot,sched_pdsch->rbSize );
+    }
     const rnti_t rnti = UE->rnti;
 
     /* POST processing */
@@ -982,7 +1006,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     harq->feedback_slot = pucch->ul_slot;
     harq->is_waiting = true;
     UE->mac_stats.dl.rounds[harq->round]++;
-    LOG_D(NR_MAC,
+    LOG_I(NR_MAC,
           "%4d.%2d [DLSCH/PDSCH/PUCCH] RNTI %04x DCI L %d start %3d RBs %3d startSymbol %2d nb_symbol %2d dmrspos %x MCS %2d nrOfLayers %d TBS %4d HARQ PID %2d round %d RV %d NDI %d dl_data_to_ULACK %d (%d.%d) PUCCH allocation %d TPC %d\n",
           frame,
           slot,
@@ -1018,6 +1042,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
       memset(dl_tti_pdcch_pdu, 0, sizeof(nfapi_nr_dl_tti_request_pdu_t));
       dl_tti_pdcch_pdu->PDUType = NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE;
       dl_tti_pdcch_pdu->PDUSize = (uint8_t)(2+sizeof(nfapi_nr_dl_tti_pdcch_pdu));
+       // printf("pdu size %d \n",dl_tti_pdcch_pdu->PDUSize);
       dl_req->nPDUs += 1;
       pdcch_pdu = &dl_tti_pdcch_pdu->pdcch_pdu.pdcch_pdu_rel15;
       LOG_D(NR_MAC,"Trying to configure DL pdcch for UE %04x, bwp %d, cs %d\n", UE->rnti, bwp_id, coresetid);
@@ -1030,6 +1055,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     memset(dl_tti_pdsch_pdu, 0, sizeof(nfapi_nr_dl_tti_request_pdu_t));
     dl_tti_pdsch_pdu->PDUType = NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE;
     dl_tti_pdsch_pdu->PDUSize = (uint8_t)(2+sizeof(nfapi_nr_dl_tti_pdsch_pdu));
+     // printf("pdu size %d \n",dl_tti_pdsch_pdu->PDUSize);
     dl_req->nPDUs += 1;
     nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
     pdsch_pdu->pduBitmap = 0;
@@ -1279,6 +1305,16 @@ void nr_schedule_ue_spec(module_id_t module_id,
                   lcid,
                   ndata,
                   bufEnd-buf-sizeof(NR_MAC_SUBHEADER_LONG));
+                  // printf(
+                  // "%4d.%2d RNTI %04x: %d bytes from %s %d (ndata %d, remaining size %ld)\n",
+                  // frame,
+                  // slot,
+                  // rnti,
+                  // len,
+                  // lcid < 4 ? "DCCH" : "DTCH",
+                  // lcid,
+                  // ndata,
+                  // bufEnd-buf-sizeof(NR_MAC_SUBHEADER_LONG));
 
             if (len == 0)
               break;
@@ -1306,6 +1342,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
           header->R = 0;
           header->F = 1;
           header->LCID = DL_SCH_LCID_PADDING;
+          //printf("DL_SCH_LCID_PADDING \n");
           buf += sizeof(NR_MAC_SUBHEADER_LONG);
           header->L = htons(bufEnd-buf);
 
@@ -1328,6 +1365,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
         NR_MAC_SUBHEADER_FIXED *padding = (NR_MAC_SUBHEADER_FIXED *) buf;
         padding->R = 0;
         padding->LCID = DL_SCH_LCID_PADDING;
+       // printf("DL_SCH_LCID_PADDING \n");
         buf += 1;
         memset(buf,0,bufEnd-buf);
         buf=bufEnd;
@@ -1371,6 +1409,9 @@ void nr_schedule_ue_spec(module_id_t module_id,
     TX_req->Number_of_PDUs++;
     TX_req->SFN = frame;
     TX_req->Slot = slot;
+    LOG_I(NR_MAC,"[%d.%d]Built TX_REQ number of pdu %d, PDU index %d, length %d\n",
+          frame, slot, TX_req->Number_of_PDUs, tx_req->PDU_index, tx_req->PDU_length);
+    // printf("[%d.%d]Built TX_REQ number of pdu %d, PDU index %d, length %d, TBS was %d Rbs Allocated %d\n",   frame, slot, TX_req->Number_of_PDUs, tx_req->PDU_index, tx_req->PDU_length, TBS, sched_pdsch->rbSize );
     /* mark UE as scheduled */
     sched_pdsch->rbSize = 0;
   }

@@ -273,9 +273,8 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
   int index = ul_buffer_index(frameP, slotP, mu, gNB->UL_tti_req_ahead_size);
   nfapi_nr_ul_tti_request_t *UL_tti_req = &RC.nrmac[module_idP]->UL_tti_req_ahead[0][index];
   nfapi_nr_config_request_scf_t *cfg = &RC.nrmac[module_idP]->config[0];
-
   if (is_nr_UL_slot(scc->tdd_UL_DL_ConfigurationCommon, slotP, cc->frame_type)) {
-
+    
     uint8_t config_index = scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.prach_ConfigurationIndex;
     uint8_t N_dur, N_t_slot, start_symbol = 0, N_RA_slot;
     uint16_t RA_sfn_index = -1;
@@ -576,8 +575,8 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     for(int j = 0; j < ra->preambles.num_preambles; j++) {
       //check if the preamble received correspond to one of the listed or configured preambles
       if (preamble_index == ra->preambles.preamble_list[j]) {
-        if (ra->rnti == 0 && get_softmodem_params()->nsa)
-          continue;
+        // if (ra->rnti == 0 && get_softmodem_params()->nsa)
+        //   continue;
         pr_found=1;
         break;
       }
@@ -595,7 +594,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
       ra_rnti = 1 + symbol + (9 /*slotP*/ * 14) + (freq_index * 14 * 80) + (ul_carrier_id * 14 * 80 * 8);
     else
       ra_rnti = 1 + symbol + (slotP * 14) + (freq_index * 14 * 80) + (ul_carrier_id * 14 * 80 * 8);
-
+      LOG_I(NR_MAC, "Computed ra_RNTI is %x \n", ra_rnti);  
     // Configure RA BWP
     configure_UE_BWP(nr_mac, scc, NULL, ra, NULL, -1, -1);
 
@@ -615,6 +614,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     if (ra->cfra) {
       // if the preamble received correspond to one of the listed
       if (!(preamble_index == ra->preambles.preamble_list[beam_index])) {
+
         LOG_E(
             NR_MAC,
             "[gNB %d][RAPROC] FAILURE: preamble %d does not correspond to any of the ones in rach_ConfigDedicated\n",
@@ -1646,6 +1646,7 @@ static void nr_generate_Msg4(module_id_t module_idP,
     int current_harq_pid = sched_ctrl->retrans_dl_harq.head;
 
     logical_chan_id_t lcid = DL_SCH_LCID_CCCH;
+    //printf("DL_SCH_LCID_CCCH \n");
     if (current_harq_pid < 0) {
       // Check for data on SRB0 (RRCSetup)
       mac_rlc_status_resp_t srb_status = mac_rlc_status_ind(module_idP, ra->rnti, module_idP, frameP, slotP, ENB_FLAG_YES, MBMS_FLAG_NO, lcid, 0, 0);
@@ -1831,6 +1832,7 @@ static void nr_generate_Msg4(module_id_t module_idP,
       NR_MAC_SUBHEADER_FIXED *padding = (NR_MAC_SUBHEADER_FIXED *) &buf[ra->mac_pdu_length];
       padding->R = 0;
       padding->LCID = DL_SCH_LCID_PADDING;
+     // printf("DL_SCH_LCID_PADDING \n");
       for(int k = ra->mac_pdu_length+1; k<harq->tb_size; k++) {
         buf[k] = 0;
       }
@@ -1877,7 +1879,7 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   NR_UE_harq_t *harq = &sched_ctrl->harq_processes[current_harq_pid];
 
-  LOG_D(NR_MAC, "ue rnti 0x%04x, harq is waiting %d, round %d, frame %d %d, harq id %d\n", ra->rnti, harq->is_waiting, harq->round, frame, slot, current_harq_pid);
+  LOG_I(NR_MAC, "ue rnti 0x%04x, harq is waiting %d, round %d, frame %d %d, harq id %d\n", ra->rnti, harq->is_waiting, harq->round, frame, slot, current_harq_pid);
 
   if (harq->is_waiting == 0) {
     if (harq->round == 0) {

@@ -134,7 +134,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
     uint16_t mac_subheader_len=sizeof(NR_MAC_SUBHEADER_FIXED);
     uint8_t rx_lcid = ((NR_MAC_SUBHEADER_FIXED *)pduP)->LCID;
 
-    LOG_D(NR_MAC, "In %s: received UL-SCH sub-PDU with LCID 0x%x in %d.%d (remaining PDU length %d)\n", __func__, rx_lcid, frameP, slot, pdu_len);
+    LOG_I(NR_MAC, "In %s: received UL-SCH sub-PDU with LCID 0x%x in %d.%d (remaining PDU length %d)\n", __func__, rx_lcid, frameP, slot, pdu_len);
 
     unsigned char *ce_ptr;
     int n_Lcg = 0;
@@ -145,6 +145,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
          LOG_D(NR_MAC, "[UE] LCID %d, PDU length %d\n", ((NR_MAC_SUBHEADER_FIXED *)pduP)->LCID, pdu_len);
       #endif*/
       case UL_SCH_LCID_RECOMMENDED_BITRATE_QUERY:
+        
         // 38.321 Ch6.1.3.20
         mac_len = 2;
         break;
@@ -451,11 +452,12 @@ static int nr_process_mac_pdu(instance_t module_idP,
       pdu_len -= ( mac_subheader_len + mac_len );
 
       if (pdu_len < 0) {
-        LOG_E(NR_MAC, "In %s: residual UL MAC PDU in %d.%d with length < 0!, pdu_len %d \n", __func__, frameP, slot, pdu_len);
+        LOG_E(NR_MAC, "In %s: residual UL MAC PDU in %d.%d with length < 0!, pdu_len %d lcid was %d\n", __func__, frameP, slot, pdu_len, rx_lcid);
         LOG_E(NR_MAC, "MAC PDU ");
-        for (int i = 0; i < 20; i++) // Only printf 1st - 20nd bytes
+        for (int i = 0; i < pdu_len; i++) // Only printf 1st - 20nd bytes
           printf("%02x ", pduP[i]);
         printf("\n");
+        
         return 0;
       }
   }
@@ -525,8 +527,8 @@ void handle_nr_ul_harq(const int CC_idP,
   LOG_D(NR_MAC, "Comparing crc_pdu->harq_id vs feedback harq_pid = %d %d\n",crc_pdu->harq_id, harq_pid);
   while (crc_pdu->harq_id != harq_pid || harq_pid < 0) {
     LOG_W(NR_MAC,
-          "Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x (ignore this warning for RA)\n",
-          crc_pdu->harq_id,
+          "[%d.%d]Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x (ignore this warning for RA)\n", frame,slot,
+           crc_pdu->harq_id,
           harq_pid,
           crc_pdu->rnti);
     if (harq_pid < 0) {
@@ -1369,7 +1371,7 @@ long get_K2(NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList,
 }
 
 static bool nr_UE_is_to_be_scheduled(const NR_ServingCellConfigCommon_t *scc, int CC_id,  NR_UE_info_t* UE, frame_t frame, sub_frame_t slot, uint32_t ulsch_max_frame_inactivity)
-{
+{ 
   const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
   const int now = frame * n + slot;
 
@@ -1770,7 +1772,9 @@ static void pf_ul(module_id_t module_id,
                          sched_ctrl->aggregation_level);
 
       NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
+     // printf(" nrmac->min_grant_mcs %d , sched_pusch->mcs %d \n", nrmac->min_grant_mcs, sched_pusch->mcs);
       sched_pusch->mcs = min(nrmac->min_grant_mcs, sched_pusch->mcs);
+      //sched_pusch->mcs = 28;
       update_ul_ue_R_Qm(sched_pusch->mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched_pusch->R, &sched_pusch->Qm);
       sched_pusch->rbStart = rbStart;
       sched_pusch->rbSize = min_rb;
@@ -2154,7 +2158,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
     sched_ctrl->last_ul_frame = sched_pusch->frame;
     sched_ctrl->last_ul_slot = sched_pusch->slot;
 
-    LOG_D(NR_MAC,
+    LOG_I(NR_MAC,
           "ULSCH/PUSCH: %4d.%2d RNTI %04x UL sched %4d.%2d DCI L %d start %2d RBS %3d startSymbol %2d nb_symbol %2d dmrs_pos %x MCS Table %2d MCS %2d nrOfLayers %2d num_dmrs_cdm_grps_no_data %2d TBS %4d HARQ PID %2d round %d RV %d NDI %d est %6d sched %6d est BSR %6d TPC %d\n",
           frame,
           slot,

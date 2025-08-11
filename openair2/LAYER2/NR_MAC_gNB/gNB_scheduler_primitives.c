@@ -157,7 +157,7 @@ uint16_t get_pm_index(const NR_UE_info_t *UE,
 }
 
 uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx)
-{
+{ //return 28;
   if (cqi_idx <= 0) {
     LOG_E(NR_MAC, "invalid cqi_idx %d, default to MCS 9\n", cqi_idx);
     return 9;
@@ -639,7 +639,7 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
                       NR_bler_stats_t *bler_stats,
                       int max_mcs,
                       frame_t frame)
-{
+{ return 28;
   /* first call: everything is zero. Initialize to sensible default */
   if (bler_stats->last_frame == 0 && bler_stats->mcs == 0) {
     bler_stats->last_frame = frame;
@@ -740,7 +740,7 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
       AssertFatal(0, "Valid UL formats are 0_0 and 0_1\n");
   }
 
-  LOG_D(NR_MAC,
+  LOG_I(NR_MAC,
         "%s() ULDCI type 0 payload: dci_format %d, freq_alloc %d, time_alloc %d, freq_hop_flag %d, precoding_information.val %d antenna_ports.val %d mcs %d tpc %d ndi %d rv %d\n",
         __func__,
         dci_format,
@@ -1646,7 +1646,7 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
       pos += 1;
       *dci_pdu |= ((uint64_t)dci_pdu_rel15->ulsch_indicator & 0x1) << (dci_size - pos);
 
-#ifdef DEBUG_DCI
+#ifdef DEBUG_DCI 
         LOG_I(NR_MAC,"============= NR_UL_DCI_FORMAT_0_1 =============\n");
         LOG_I(NR_MAC,"dci_size = %i\n", dci_size);
         LOG_I(NR_MAC,"dci_pdu_rel15->format_indicator = %i\n", dci_pdu_rel15->format_indicator);
@@ -2194,6 +2194,7 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
   DL_BWP->BWPStart = NRRIV2PRBOFFSET(dl_genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   sc_info->initial_dl_BWPSize =
       NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
+   // printf("**********************initial_dl_BWPSize %d\n", sc_info->initial_dl_BWPSize);
   sc_info->initial_dl_BWPStart =
       NRRIV2PRBOFFSET(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
 
@@ -2667,7 +2668,7 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
           memset((void*)dl_tti_csirs_pdu,0,sizeof(nfapi_nr_dl_tti_request_pdu_t));
           dl_tti_csirs_pdu->PDUType = NFAPI_NR_DL_TTI_CSI_RS_PDU_TYPE;
           dl_tti_csirs_pdu->PDUSize = (uint8_t)(2+sizeof(nfapi_nr_dl_tti_csi_rs_pdu));
-
+          //printf("pdu size %d \n",dl_tti_csirs_pdu->PDUSize);
           nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csirs_pdu_rel15 = &dl_tti_csirs_pdu->csi_rs_pdu.csi_rs_pdu_rel15;
           csirs_pdu_rel15->bwp_size = dl_bwp->BWPSize;
           csirs_pdu_rel15->bwp_start = dl_bwp->BWPStart;

@@ -760,7 +760,7 @@ int phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
 int phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
 {
 
-  LOG_D(NR_MAC, "In %s() NFAPI SFN/SF: %d/%d number_of_pdus :%u\n",
+  LOG_I(NR_MAC, "In %s() NFAPI SFN/SF: %d/%d number_of_pdus :%u\n",
           __FUNCTION__,ind->sfn, ind->slot, ind->num_ucis);
   if(NFAPI_MODE == NFAPI_MODE_VNF)
   {
@@ -787,25 +787,30 @@ int phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
         }
 
         case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
+          LOG_I(NR_MAC, "NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE\n");
           nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_ind_pdu = &uci_ind->uci_list[i].pucch_pdu_format_2_3_4;
           nfapi_nr_uci_pucch_pdu_format_2_3_4_t *ind_pdu = &ind->uci_list[i].pucch_pdu_format_2_3_4;
           *uci_ind_pdu = *ind_pdu;
           if (ind_pdu->harq.harq_payload) {
+            LOG_I(NR_MAC, "NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE harq_payload present\n");
             uci_ind_pdu->harq.harq_payload = CALLOC(1, sizeof(*uci_ind_pdu->harq.harq_payload));
             AssertFatal(uci_ind_pdu->harq.harq_payload != NULL, "Memory not allocated for uci_ind_pdu->harq.harq_payload in phy_nr_uci_indication.");
             *uci_ind_pdu->harq.harq_payload = *ind_pdu->harq.harq_payload;
           }
           if (ind_pdu->sr.sr_payload) {
+            LOG_I(NR_MAC, "NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE sr_payload present\n");
             uci_ind_pdu->sr.sr_payload = CALLOC(1, sizeof(*uci_ind_pdu->sr.sr_payload));
             AssertFatal(uci_ind_pdu->sr.sr_payload != NULL, "Memory not allocated for uci_ind_pdu->sr.sr_payload in phy_nr_uci_indication.");
             *uci_ind_pdu->sr.sr_payload = *ind_pdu->sr.sr_payload;
           }
           if (ind_pdu->csi_part1.csi_part1_payload) {
+            LOG_I(NR_MAC, "NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE csi_part1_payload present\n");
             uci_ind_pdu->csi_part1.csi_part1_payload = CALLOC(1, sizeof(*uci_ind_pdu->csi_part1.csi_part1_payload));
             AssertFatal(uci_ind_pdu->csi_part1.csi_part1_payload != NULL, "Memory not allocated for uci_ind_pdu->csi_part1.csi_part1_payload in phy_nr_uci_indication.");
             *uci_ind_pdu->csi_part1.csi_part1_payload = *ind_pdu->csi_part1.csi_part1_payload;
           }
           if (ind_pdu->csi_part2.csi_part2_payload) {
+            LOG_I(NR_MAC, "NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE csi_part2_payload present\n");
             uci_ind_pdu->csi_part2.csi_part2_payload = CALLOC(1, sizeof(*uci_ind_pdu->csi_part2.csi_part2_payload));
             AssertFatal(uci_ind_pdu->csi_part2.csi_part2_payload != NULL, "Memory not allocated for uci_ind_pdu->csi_part2.csi_part2_payload in phy_nr_uci_indication.");
             *uci_ind_pdu->csi_part2.csi_part2_payload = *ind_pdu->csi_part2.csi_part2_payload;

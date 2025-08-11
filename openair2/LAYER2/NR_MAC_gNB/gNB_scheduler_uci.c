@@ -996,7 +996,7 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
     return;
   }
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-
+  LOG_D(NR_MAC, "uci_01->pduBitmap %d  \n", uci_01->pduBitmap );
   if (((uci_01->pduBitmap >> 1) & 0x01)) {
     // iterate over received harq bits
     for (int harq_bit = 0; harq_bit < uci_01->harq.num_harq; harq_bit++) {
@@ -1010,7 +1010,7 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
       DevAssert(harq->is_waiting);
       const int8_t pid = sched_ctrl->feedback_dl_harq.head;
       remove_front_nr_list(&sched_ctrl->feedback_dl_harq);
-      LOG_D(NR_MAC,"%4d.%2d bit %d pid %d ack/nack %d\n",frame, slot, harq_bit,pid,harq_value);
+      LOG_I(NR_MAC,"%4d.%2d bit %d pid %d ack/nack %d\n",frame, slot, harq_bit,pid,harq_value);
       handle_dl_harq(UE, pid, harq_value == 0 && harq_confidence == 0, nrmac->dl_bler.harq_round_max);
       if (!UE->Msg4_ACKed && harq_value == 0 && harq_confidence == 0)
         UE->Msg4_ACKed = true;
@@ -1233,15 +1233,20 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
 
   uint8_t pdsch_to_harq_feedback[8];
   int fb_size = get_pdsch_to_harq_feedback(pucch_Config, dci_format, pdsch_to_harq_feedback);
-
+  // printf("[%d.%d] PDSCH to HARQ feedback size: %d\n", frame, slot, fb_size);
   for (int f = 0; f < fb_size; f++) {
     // can't schedule ACKNACK before minimum feedback time
-    if(pdsch_to_harq_feedback[f] < minfbtime)
+    if(pdsch_to_harq_feedback[f] < minfbtime){
+      // printf("[%d.%d] pdsch_to_harq_feedback[f] < minfbtime\n", frame, slot);
       continue;
+    }
+
     const int pucch_slot = (slot + pdsch_to_harq_feedback[f]) % n_slots_frame;
     // check if the slot is UL
-    if(pucch_slot%nr_slots_period < first_ul_slot_period)
+    if(pucch_slot%nr_slots_period < first_ul_slot_period){
+      // printf("[%d.%d] pucch_slot r_slots_period < first_ul_slot_period\n", frame, slot);
       continue;
+    }
     const int pucch_frame = (frame + ((slot + pdsch_to_harq_feedback[f]) / n_slots_frame)) & 1023;
     // we store PUCCH resources according to slot, TDD configuration and size of the vector containing PUCCH structures
     const int pucch_index = get_pucch_index(pucch_frame, pucch_slot, n_slots_frame, tdd, sched_ctrl->sched_pucch_size);
@@ -1252,12 +1257,16 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
       LOG_D(NR_MAC, "pucch_acknack DL %4d.%2d, UL_ACK %4d.%2d Bits already in current PUCCH: DAI_C %d CSI %d\n",
             frame, slot, pucch_frame, pucch_slot, curr_pucch->dai_c, curr_pucch->csi_bits);
       // we can't schedule if short pucch is already full
-      if (curr_pucch->csi_bits == 0 &&
-          curr_pucch->dai_c == 2)
+        if (curr_pucch->csi_bits == 0 &&
+            curr_pucch->dai_c == 2){
+        // printf("[%d.%d] PUCCH is full, cannot schedule\n",  frame, slot);
         continue;
+          }
       // if there is CSI but simultaneous HARQ+CSI is disable we can't schedule
-      if (curr_pucch->csi_bits > 0 && !curr_pucch->simultaneous_harqcsi)
+      if (curr_pucch->csi_bits > 0 && !curr_pucch->simultaneous_harqcsi){
+        // printf("[%d.%d] PUCCH is full, cannot schedule\n",  frame, slot);
         continue;
+      }
       // check if the number of bits to be scheduled can fit in current PUCCH
       // according to PUCCH code rate (if not we search for another allocation)
       // the number of bits in the check need to include possible SR (1 bit)
@@ -1266,15 +1275,17 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
       if (curr_pucch->csi_bits > 0
           && !check_bits_vs_coderate_limit(pucch_Config,
                                            curr_pucch->csi_bits + curr_pucch->dai_c + 2,
-                                           curr_pucch->resource_indicator))
+                                           curr_pucch->resource_indicator)){
+        // printf("[%d.%d] PUCCH cannot schedule, not enough resources\n",  frame, slot);
         continue;
-
+       }
       // otherwise we can schedule in this active PUCCH
       // no need to check VRB occupation because already done when PUCCH has been activated
       curr_pucch->timing_indicator = f;
       curr_pucch->dai_c++;
       LOG_D(NR_MAC, "DL %4d.%2d, UL_ACK %4d.%2d Scheduling ACK/NACK in PUCCH %d with timing indicator %d DAI %d CSI %d\n",
             frame,slot,curr_pucch->frame,curr_pucch->ul_slot,pucch_index,f,curr_pucch->dai_c,curr_pucch->csi_bits);
+      
       return pucch_index; // index of current PUCCH structure
     }
     else if (curr_pucch->active) {
@@ -1293,6 +1304,8 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
       if(!ret) {
         LOG_D(NR_MAC, "DL %4d.%2d, UL_ACK %4d.%2d PRB resources for this occasion are already occupied, move to the following occasion\n",
               frame, slot, pucch_frame, pucch_slot);
+        // printf("DL %4d.%2d, UL_ACK %4d.%2d PRB resources for this occasion are already occupied, move to the following occasion\n",     frame, slot, pucch_frame, pucch_slot);
+
         continue;
       }
       // allocating a new PUCCH structure for this occasion
@@ -1314,6 +1327,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
     }
   }
   LOG_D(NR_MAC, "DL %4d.%2d, Couldn't find scheduling occasion for this HARQ process\n", frame, slot);
+  // printf("DL %4d.%2d, Couldn't find scheduling occasion for this HARQ process\n", frame, slot);
   return -1;
 }
 

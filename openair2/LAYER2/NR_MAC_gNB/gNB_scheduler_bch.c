@@ -64,7 +64,7 @@ static void schedule_ssb(frame_t frame,
   memset((void *) dl_config_pdu, 0,sizeof(nfapi_nr_dl_tti_request_pdu_t));
   dl_config_pdu->PDUType      = NFAPI_NR_DL_TTI_SSB_PDU_TYPE;
   dl_config_pdu->PDUSize      =2 + sizeof(nfapi_nr_dl_tti_ssb_pdu_rel15_t);
-
+  //printf("pdu size %d \n",dl_config_pdu->PDUSize);
   AssertFatal(scc->physCellId!=NULL,"ServingCellConfigCommon->physCellId is null\n");
   dl_config_pdu->ssb_pdu.ssb_pdu_rel15.PhysCellId          = *scc->physCellId;
   dl_config_pdu->ssb_pdu.ssb_pdu_rel15.BetaPss             = 0;
@@ -401,6 +401,7 @@ static void nr_fill_nfapi_dl_sib1_pdu(int Mod_idP,
   memset((void*)dl_tti_pdcch_pdu,0,sizeof(nfapi_nr_dl_tti_request_pdu_t));
   dl_tti_pdcch_pdu->PDUType = NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE;
   dl_tti_pdcch_pdu->PDUSize = (uint8_t)(2+sizeof(nfapi_nr_dl_tti_pdcch_pdu));
+    //printf("pdu size %d \n",dl_tti_pdcch_pdu->PDUSize);
   dl_req->nPDUs += 1;
   nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15 = &dl_tti_pdcch_pdu->pdcch_pdu.pdcch_pdu_rel15;
   nr_configure_pdcch(pdcch_pdu_rel15,
@@ -412,6 +413,7 @@ static void nr_fill_nfapi_dl_sib1_pdu(int Mod_idP,
   memset((void*)dl_tti_pdsch_pdu,0,sizeof(nfapi_nr_dl_tti_request_pdu_t));
   dl_tti_pdsch_pdu->PDUType = NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE;
   dl_tti_pdsch_pdu->PDUSize = (uint8_t)(2+sizeof(nfapi_nr_dl_tti_pdsch_pdu));
+    //printf("pdu size %d \n",dl_tti_pdsch_pdu->PDUSize);
   dl_req->nPDUs += 1;
   nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
 

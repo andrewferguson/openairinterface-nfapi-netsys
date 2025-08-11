@@ -97,6 +97,7 @@ void handle_nr_rach(NR_UL_IND_t *UL_info)
 
 void handle_nr_uci(NR_UL_IND_t *UL_info)
 {
+  LOG_I(NR_MAC, "[%d.%d] Handling NR UCI \n", UL_info->frame, UL_info->slot);
   if(NFAPI_MODE == NFAPI_MODE_PNF) {
     if (UL_info->uci_ind.num_ucis > 0) {
       LOG_D(PHY,"PNF Sending UL_info->num_ucis:%d PDU_type: %d, SFN/SF:%d.%d \n", UL_info->uci_ind.num_ucis, UL_info->uci_ind.uci_list[0].pdu_type ,UL_info->frame, UL_info->slot);
@@ -111,7 +112,7 @@ void handle_nr_uci(NR_UL_IND_t *UL_info)
   const sub_frame_t slot = UL_info->uci_ind.slot;
   int num_ucis = UL_info->uci_ind.num_ucis;
   nfapi_nr_uci_t *uci_list = UL_info->uci_ind.uci_list;
-
+  
   for (int i = 0; i < num_ucis; i++) {
     switch (uci_list[i].pdu_type) {
       case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
@@ -120,7 +121,7 @@ void handle_nr_uci(NR_UL_IND_t *UL_info)
 
       case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
         const nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_pdu = &uci_list[i].pucch_pdu_format_0_1;
-        LOG_D(NR_MAC, "The received uci has sfn slot %d %d, num_ucis %d and pdu_size %d\n",
+        LOG_I(NR_MAC, "The received uci has sfn slot %d %d, num_ucis %d and pdu_size %d\n",
                 UL_info->uci_ind.sfn, UL_info->uci_ind.slot, num_ucis, uci_list[i].pdu_size);
         handle_nr_uci_pucch_0_1(mod_id, frame, slot, uci_pdu);
         break;
@@ -447,7 +448,7 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
   handle_nr_srs(UL_info);
 
   if (get_softmodem_params()->emulate_l1) {
-    free_unqueued_nfapi_indications(rach_ind, uci_ind, rx_ind, crc_ind);
+    //free_unqueued_nfapi_indications(rach_ind, uci_ind, rx_ind, crc_ind);
   }
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
     gNB_MAC_INST     *mac        = RC.nrmac[module_id];

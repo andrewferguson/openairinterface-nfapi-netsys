@@ -475,6 +475,7 @@ int vnf_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info, u
 int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_p7_message_header_t* header)
 {
 
+
 	nfapi_vnf_p7_connection_info_t* p7_connection = vnf_p7_connection_info_list_find(vnf_p7, header->phy_id);
 	if(p7_connection)
 	{
@@ -1499,7 +1500,7 @@ void vnf_handle_nr_rx_data_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* 
 		}
 		else
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "%s: Handling RX Indication\n", __FUNCTION__);
+			NFAPI_TRACE(NFAPI_TRACE_INFO, "[%d.%d]%s: Handling RX Indication\n",  ind.sfn, ind.slot, __FUNCTION__);
                         if(vnf_p7->_public.nr_rx_data_indication)
 			{
 				(vnf_p7->_public.nr_rx_data_indication)(&ind);
@@ -1525,7 +1526,7 @@ void vnf_handle_nr_crc_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_
 		}
 		else
 		{
-		        NFAPI_TRACE(NFAPI_TRACE_INFO, "%s: Handling CRC Indication\n", __FUNCTION__);
+			NFAPI_TRACE(NFAPI_TRACE_INFO, "[%d.%d]%s: Handling CRC Indication\n",  ind.sfn, ind.slot, __FUNCTION__);
 			if(vnf_p7->_public.nr_crc_indication)
 			{
 				(vnf_p7->_public.nr_crc_indication)(&ind);
@@ -1576,7 +1577,7 @@ void vnf_handle_nr_uci_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_
 		}
 		else
 		{
-		        NFAPI_TRACE(NFAPI_TRACE_INFO, "%s: Handling UCI Indication\n", __FUNCTION__);
+		        NFAPI_TRACE(NFAPI_TRACE_INFO, "[%d.%d]%s: Handling UCI Indication\n",  ind.sfn, ind.slot, __FUNCTION__);
 			if(vnf_p7->_public.nr_uci_indication)
 			{
 				(vnf_p7->_public.nr_uci_indication)(&ind);
@@ -1602,7 +1603,9 @@ void vnf_handle_nr_rach_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf
 		}
 		else
 		{
-		        NFAPI_TRACE(NFAPI_TRACE_INFO, "%s: Handling RACH Indication\n", __FUNCTION__);
+
+				  NFAPI_TRACE(NFAPI_TRACE_INFO, "[%d.%d]%s: Handling RACH  Indication\n",  ind.sfn, ind.slot, __FUNCTION__);
+
 			if(vnf_p7->_public.nr_rach_indication)
 			{
 				(vnf_p7->_public.nr_rach_indication)(&ind);
@@ -2196,7 +2199,10 @@ void vnf_nr_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7
 		case NFAPI_TIMING_INFO:
 			vnf_nr_handle_timing_info(pRecvMsg, recvMsgLen, vnf_p7);
 			break;
-		
+			
+		case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
+			vnf_handle_nr_uci_indication(pRecvMsg, recvMsgLen, vnf_p7);
+			break;
 		case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
 			vnf_handle_nr_slot_indication(pRecvMsg, recvMsgLen, vnf_p7);
 			break;
@@ -2209,9 +2215,7 @@ void vnf_nr_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7
 			vnf_handle_nr_crc_indication(pRecvMsg, recvMsgLen, vnf_p7);
 			break;
 	
-		case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
-			vnf_handle_nr_uci_indication(pRecvMsg, recvMsgLen, vnf_p7);
-			break;
+
 	
 		case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
 			vnf_handle_nr_srs_indication(pRecvMsg, recvMsgLen, vnf_p7);
