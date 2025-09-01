@@ -71,7 +71,7 @@ void *nrmac_stats_thread(void *arg) {
     fwrite(output, p - output, 1, file);
     fflush(file);
     sleep(1);
-    fseek(file,0,SEEK_SET);
+    // fseek(file,0,SEEK_SET);
   }
   fclose(file);
   return NULL;
@@ -94,21 +94,27 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
   NR_SCHED_ENSURE_LOCKED(&gNB->sched_lock);
 
   NR_SCHED_LOCK(&gNB->UE_info.mutex);
+  
   UE_iterator(gNB->UE_info.list, UE) {
+
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_mac_stats_t *stats = &UE->mac_stats;
     const int avg_rsrp = stats->num_rsrp_meas > 0 ? stats->cumul_rsrp / stats->num_rsrp_meas : 0;
 
+    // output += snprintf(output,
+    //                    end - output,
+    //                    "UE RNTI %04x (%d) PH %d dB PCMAX %d dBm, average RSRP %d (%d meas)\n",
+    //                    UE->rnti,
+    //                    num++,
+    //                    sched_ctrl->ph,
+    //                    sched_ctrl->pcmax,
+    //                    avg_rsrp,
+    //                    stats->num_rsrp_meas);
     output += snprintf(output,
-                       end - output,
-                       "UE RNTI %04x (%d) PH %d dB PCMAX %d dBm, average RSRP %d (%d meas)\n",
-                       UE->rnti,
-                       num++,
-                       sched_ctrl->ph,
-                       sched_ctrl->pcmax,
-                       avg_rsrp,
-                       stats->num_rsrp_meas);
-
+                         end - output,
+                         "UE %04x: [%d.%d]\n",
+                         UE->rnti,
+                         sched_ctrl->last_ul_frame,sched_ctrl->last_ul_slot);
     if(sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.print_report)
       output += snprintf(output,
                          end - output,
@@ -129,22 +135,35 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
     output += snprintf(output, end - output, "%"PRIu64, stats->dl.rounds[0]);
     for (int i = 1; i < gNB->dl_bler.harq_round_max; i++)
       output += snprintf(output, end - output, "/%"PRIu64, stats->dl.rounds[i]);
-
-    output += snprintf(output,
-                       end - output,
-                       ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS %d\n",
-                       stats->dl.errors,
-                       stats->pucch0_DTX,
-                       sched_ctrl->dl_bler_stats.bler,
-                       sched_ctrl->dl_bler_stats.mcs);
+    output += snprintf(output, end - output, "\n");
+    // output += snprintf(output,
+    //                    end - output,
+    //                    ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS %d\n",
+    //                    stats->dl.errors,
+    //                    stats->pucch0_DTX,
+    //                    sched_ctrl->dl_bler_stats.bler,
+    //                    sched_ctrl->dl_bler_stats.mcs);
     if (reset_rsrp) {
       stats->num_rsrp_meas = 0;
       stats->cumul_rsrp = 0;
     }
+
     output += snprintf(output,
                        end - output,
                        "UE %04x: dlsch_total_bytes %"PRIu64"\n",
                        UE->rnti, stats->dl.total_bytes);
+    output += snprintf(output,
+                       end - output,
+                       "UE %04x: dlsch_total_rbs %"PRIu64"\n",
+                       UE->rnti, stats->dl.total_rbs);
+    output += snprintf(output,
+                       end - output,
+                       "UE %04x: dlsch_current_bytes %"PRIu64"\n",
+                       UE->rnti, stats->dl.current_bytes);
+    output += snprintf(output,
+                       end - output,
+                       "UE %04x: dlsch_current_rbs %"PRIu64"\n",
+                       UE->rnti, stats->dl.current_rbs);
     output += snprintf(output,
                        end - output,
                        "UE %04x: ulsch_rounds ", UE->rnti);
@@ -152,29 +171,29 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
     for (int i = 1; i < gNB->ul_bler.harq_round_max; i++)
       output += snprintf(output, end - output, "/%"PRIu64, stats->ul.rounds[i]);
 
-    output += snprintf(output,
-                       end - output,
-                       ", ulsch_DTX %d, ulsch_errors %"PRIu64", BLER %.5f MCS %d\n",
-                       stats->ulsch_DTX,
-                       stats->ul.errors,
-                       sched_ctrl->ul_bler_stats.bler,
-                       sched_ctrl->ul_bler_stats.mcs);
+    // output += snprintf(output,
+    //                    end - output,
+    //                    ", ulsch_DTX %d, ulsch_errors %"PRIu64", BLER %.5f MCS %d\n",
+    //                    stats->ulsch_DTX,
+    //                    stats->ul.errors,
+    //                    sched_ctrl->ul_bler_stats.bler,
+    //                    sched_ctrl->ul_bler_stats.mcs);
     output += snprintf(output,
                        end - output,
                        "UE %04x: ulsch_total_bytes_scheduled %"PRIu64", ulsch_total_bytes_received %"PRIu64"\n",
                        UE->rnti,
                        stats->ulsch_total_bytes_scheduled, stats->ul.total_bytes);
 
-    for (int i = 0; i < sched_ctrl->dl_lc_num; i++) {
-      int lc_id = sched_ctrl->dl_lc_ids[i];
-      output += snprintf(output,
-                         end - output,
-                         "UE %04x: LCID %d: TX %14"PRIu64" RX %14"PRIu64" bytes\n",
-                         UE->rnti,
-                         lc_id,
-                         stats->dl.lc_bytes[lc_id],
-                         stats->ul.lc_bytes[lc_id]);
-    }
+    // for (int i = 0; i < sched_ctrl->dl_lc_num; i++) {
+    //   int lc_id = sched_ctrl->dl_lc_ids[i];
+    //   output += snprintf(output,
+    //                      end - output,
+    //                      "UE %04x: LCID %d: TX %14"PRIu64" RX %14"PRIu64" bytes\n",
+    //                      UE->rnti,
+    //                      lc_id,
+    //                      stats->dl.lc_bytes[lc_id],
+    //                      stats->ul.lc_bytes[lc_id]);
+    // }
   }
   NR_SCHED_UNLOCK(&gNB->UE_info.mutex);
   return output - begin;

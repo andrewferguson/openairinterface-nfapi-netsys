@@ -1,109 +1,161 @@
-[  0%] Built target genids
 [  0%] Built target bnProc_gen_128
 [  0%] Built target cnProc_gen_128
-[  0%] Built target bnProc_gen_avx512
-[  0%] Built target bnProc_gen_avx2
 [  0%] Built target cnProc_gen_avx2
 [  0%] Built target cnProc_gen_avx512
 [  0%] Built target ds
+[  0%] Built target genids
+[  0%] Built target bnProc_gen_avx2
 [  0%] Built target tracer_utils
-[  0%] Built target bnProc_gen_avx512_files
+[  0%] Built target bnProc_gen_avx512
 [  0%] Generating LDPC bnProc header files for 128-bit SIMD
+[  0%] Generating LDPC cnProc header files for 128-bit SIMD
+[  0%] Built target cnProc_gen_avx2_files
 [  0%] Built target cnProc_gen_avx512_files
-[  0%] Built target bnProc_gen_avx2_files
 [  0%] Built target extract
+[  0%] Built target record
 [  0%] Built target extract_output_subframe
 [  1%] Built target extract_input_subframe
-[  1%] Built target record
-[  1%] Built target cnProc_gen_avx2_files
-[  1%] Built target macpdu2wireshark
-[  1%] Generating LDPC cnProc header files for 128-bit SIMD
-[  1%] Built target _check_vcd
 [  1%] Built target extract_config
 [  1%] Built target replay
-[  1%] Built target bnProc_gen_128_files
-[  1%] Checking validity of VCD files
-[  1%] Built target cnProc_gen_128_files
+[  1%] Built target bnProc_gen_avx2_files
+[  1%] Built target macpdu2wireshark
+[  1%] Built target _check_vcd
+[  1%] Built target bnProc_gen_avx512_files
 [  2%] Built target asn1_m3ap
+[  2%] Built target cnProc_gen_128_files
+[  2%] Checking validity of VCD files
+[  2%] Built target bnProc_gen_128_files
 [  2%] Built target check_vcd
-[  2%] Built target generate_T
-[  2%] Built target NFAPI_LIB
-[  3%] Built target SIMU
-Scanning dependencies of target NFAPI_COMMON_LIB
-[  3%] Built target SECURITY
-[  2%] Built target config_internals
-[  3%] Built target HASHTABLE
-[  3%] Built target dfts
-[  3%] Built target T
-[  3%] Building C object CMakeFiles/NFAPI_COMMON_LIB.dir/nfapi/open-nFAPI/common/src/debug.c.o
-[  6%] Built target asn1_m2ap
-[  6%] Built target CONFIG_LIB
-[  6%] Built target PHY_NR_COMMON
-[  6%] Built target UTIL
-[  6%] Built target PHY_NR
-[  6%] Built target multi
-[  6%] Built target shlib_loader
-Scanning dependencies of target ldpc_optim8seg
+[  4%] Built target asn1_m2ap
+[  4%] Built target generate_T
+[  4%] Built target config_internals
+[  4%] Built target dfts
+[  4%] Built target NFAPI_COMMON_LIB
+[  4%] Built target NFAPI_LIB
+[  4%] Built target HASHTABLE
+[  4%] Built target PHY_NR_COMMON
+[  6%] Built target SIMU
+[  6%] Built target SECURITY
 Scanning dependencies of target ldpc_orig
-Scanning dependencies of target ldpc
-[  6%] Building C object CMakeFiles/ldpc.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
-[  6%] Built target nr_rlc_core
-[  6%] Building C object CMakeFiles/ldpc_orig.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
-[  6%] Built target T_tools
-[  6%] Building C object CMakeFiles/ldpc_optim8seg.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
+Scanning dependencies of target ldpc_optim8seg
 Scanning dependencies of target ldpc_optim
-[  6%] Building C object CMakeFiles/ldpc_optim.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
-[  6%] Built target gen_lte_rrc_hdrs
+Scanning dependencies of target ldpc
+[  6%] Built target T
+[  6%] Built target PHY_NR
+[  6%] Building C object CMakeFiles/ldpc_orig.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
 [  6%] Built target gen_nr_rrc_hdrs
-[  6%] Built target NFAPI_VNF_LIB
-[  6%] Built target SCHED_LIB
-[  7%] Built target PHY_COMMON
-[ 12%] Built target asn1_e1ap
-[ 12%] Linking C static library libNFAPI_COMMON_LIB.a
-[ 12%] Built target PHY_RU
-[ 12%] Built target SCHED_RU_LIB
-[ 12%] Built target SCHED_NR_LIB
-[ 12%] Built target NFAPI_COMMON_LIB
-[ 12%] Built target ITTI
-[ 19%] Built target asn1_ngap
-[ 19%] Built target SCTP_CLIENT
-[ 19%] Built target SIMU_ETH
-[ 26%] Built target asn1_lpp
-[ 26%] Built target MAC_NR_COMMON
-[ 26%] Built target NFAPI_PNF_LIB
-[ 33%] Built target asn1_s1ap
-[ 33%] Built target PHY
-[ 33%] Built target NFAPI_USER_LIB
+[  6%] Building C object CMakeFiles/ldpc_optim8seg.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
+[  6%] Building C object CMakeFiles/ldpc_optim.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
+[  6%] Building C object CMakeFiles/ldpc.dir/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c.o
+[  6%] Built target CONFIG_LIB
+[  6%] Built target SCHED_NR_LIB
+[  6%] Built target UTIL
+[ 10%] Built target asn1_e1ap
+[ 10%] Built target nr_rlc_core
+[ 10%] Built target shlib_loader
+[ 10%] Built target multi
+[ 18%] Built target asn1_lpp
+[ 18%] Built target gen_lte_rrc_hdrs
+[ 18%] Built target T_tools
+[ 18%] Built target NFAPI_VNF_LIB
+[ 25%] Built target asn1_ngap
+[ 32%] Built target asn1_s1ap
+[ 32%] Built target SCHED_RU_LIB
+[ 33%] Built target PHY_COMMON
+[ 33%] Built target SCHED_LIB
+[ 33%] Built target PHY_RU
+[ 33%] Built target ITTI
+[ 33%] Built target SIMU_ETH
+[ 33%] Built target MAC_NR_COMMON
 [ 40%] Built target asn1_x2ap
+[ 40%] Built target SCTP_CLIENT
+[ 40%] Built target NFAPI_PNF_LIB
+[ 40%] Built target PHY
+[ 40%] Built target NFAPI_USER_LIB
 [ 40%] Built target GTPV1U
 [ 42%] Built target LIB_NAS_UE
-[ 42%] Built target ngap
-[ 42%] Built target x2ap
 [ 51%] Built target asn1_f1ap
-[ 78%] Built target asn1_lte_rrc
-[ 98%] Built target asn1_nr_rrc
+[ 51%] Built target ngap
+[ 51%] Built target x2ap
+[ 72%] Built target asn1_nr_rrc
+[ 98%] Built target asn1_lte_rrc
 [ 98%] Built target nr_rrc
 [ 98%] Built target lte_rrc
 [ 98%] Built target s1ap
 [ 98%] Built target m2ap
 [ 98%] Built target f1ap
+[ 98%] Built target m3ap
 [ 98%] Built target nr_rlc
 [ 98%] Built target e1ap
-[ 98%] Built target m3ap
 [ 98%] Built target e1_if
 [ 98%] Built target L2_LTE_NR
 Scanning dependencies of target L2_NR
-[ 98%] Building C object CMakeFiles/L2_NR.dir/openair2/LAYER2/NR_MAC_gNB/gNB_scheduler_dlsch.c.o
+[ 98%] Building C object CMakeFiles/L2_NR.dir/openair2/LAYER2/NR_MAC_gNB/main.c.o
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c: In function ‘dump_mac_stats’:
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:157:24: warning: format ‘%lu’ expects argument of type ‘long unsigned int’, but argument 5 has type ‘uint32_t’ {aka ‘unsigned int’} [-Wformat=]
+  157 |                        "UE %04x: dlsch_total_rbs %"PRIu64"\n",
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  158 |                        UE->rnti, stats->dl.total_rbs);
+      |                                  ~~~~~~~~~~~~~~~~~~~
+      |                                           |
+      |                                           uint32_t {aka unsigned int}
+In file included from /home/ubuntu/openairinterface-nfapi-netsys/common/utils/assertions.h:27,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/sse_intrin.h:78,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/TOOLS/tools_defs.h:35,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/radio/COMMON/common_lib.h:38,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h:65,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/mac_proto.h:34,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:33:
+/usr/include/inttypes.h:105:34: note: format string is defined here
+  105 | # define PRIu64  __PRI64_PREFIX "u"
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:161:24: warning: format ‘%lu’ expects argument of type ‘long unsigned int’, but argument 5 has type ‘uint32_t’ {aka ‘unsigned int’} [-Wformat=]
+  161 |                        "UE %04x: dlsch_current_bytes %"PRIu64"\n",
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  162 |                        UE->rnti, stats->dl.current_bytes);
+      |                                  ~~~~~~~~~~~~~~~~~~~~~~~
+      |                                           |
+      |                                           uint32_t {aka unsigned int}
+In file included from /home/ubuntu/openairinterface-nfapi-netsys/common/utils/assertions.h:27,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/sse_intrin.h:78,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/TOOLS/tools_defs.h:35,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/radio/COMMON/common_lib.h:38,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h:65,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/mac_proto.h:34,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:33:
+/usr/include/inttypes.h:105:34: note: format string is defined here
+  105 | # define PRIu64  __PRI64_PREFIX "u"
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:165:24: warning: format ‘%lu’ expects argument of type ‘long unsigned int’, but argument 5 has type ‘uint32_t’ {aka ‘unsigned int’} [-Wformat=]
+  165 |                        "UE %04x: dlsch_current_rbs %"PRIu64"\n",
+      |                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  166 |                        UE->rnti, stats->dl.current_rbs);
+      |                                  ~~~~~~~~~~~~~~~~~~~~~
+      |                                           |
+      |                                           uint32_t {aka unsigned int}
+In file included from /home/ubuntu/openairinterface-nfapi-netsys/common/utils/assertions.h:27,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/sse_intrin.h:78,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair1/PHY/TOOLS/tools_defs.h:35,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/radio/COMMON/common_lib.h:38,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h:65,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/mac_proto.h:34,
+                 from /home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:33:
+/usr/include/inttypes.h:105:34: note: format string is defined here
+  105 | # define PRIu64  __PRI64_PREFIX "u"
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:102:15: warning: unused variable ‘avg_rsrp’ [-Wunused-variable]
+  102 |     const int avg_rsrp = stats->num_rsrp_meas > 0 ? stats->cumul_rsrp / stats->num_rsrp_meas : 0;
+      |               ^~~~~~~~
+/home/ubuntu/openairinterface-nfapi-netsys/openair2/LAYER2/NR_MAC_gNB/main.c:88:7: warning: unused variable ‘num’ [-Wunused-variable]
+   88 |   int num = 1;
+      |       ^~~
 [ 98%] Linking CXX static library libL2_NR.a
 [100%] Built target L2_NR
-[100%] Linking C shared module libldpc.so
-[100%] Built target ldpc
 [100%] Linking C shared module libldpc_orig.so
 [100%] Built target ldpc_orig
-[100%] Linking C shared module libldpc_optim.so
-[100%] Built target ldpc_optim
 [100%] Linking C shared module libldpc_optim8seg.so
+[100%] Linking C shared module libldpc.so
+[100%] Linking C shared module libldpc_optim.so
 [100%] Built target ldpc_optim8seg
+[100%] Built target ldpc
+[100%] Built target ldpc_optim
 [100%] Linking CXX executable nr-softmodem
 [100%] Built target nr-softmodem
 [  0%] Built target genids
@@ -112,26 +164,26 @@ Scanning dependencies of target L2_NR
 [  0%] Checking validity of VCD files
 [  0%] Built target check_vcd
 [  0%] Built target generate_T
-[  0%] Built target SECURITY
 [  0%] Built target HASHTABLE
+[  0%] Built target SECURITY
+[  0%] Built target config_internals
 [  1%] Built target SIMU
-[  1%] Built target config_internals
 [  1%] Built target T
+[  1%] Built target gen_nr_rrc_hdrs
 [  1%] Built target CONFIG_LIB
 [  1%] Built target UTIL
-[  1%] Built target shlib_loader
-[  1%] Built target gen_nr_rrc_hdrs
-[ 12%] Built target asn1_ngap
-[ 18%] Built target asn1_e1ap
-[ 18%] Built target gen_lte_rrc_hdrs
+[  8%] Built target asn1_e1ap
+[  8%] Built target shlib_loader
+[  8%] Built target gen_lte_rrc_hdrs
+[ 18%] Built target asn1_ngap
 [ 18%] Built target ITTI
-[ 18%] Built target SCTP_CLIENT
 [ 18%] Built target SIMU_ETH
+[ 18%] Built target SCTP_CLIENT
 [ 18%] Built target GTPV1U
 [ 32%] Built target asn1_f1ap
 [ 32%] Built target ngap
-[ 70%] Built target asn1_lte_rrc
-[100%] Built target asn1_nr_rrc
+[ 62%] Built target asn1_nr_rrc
+[100%] Built target asn1_lte_rrc
 [100%] Built target nr_rrc
 [100%] Built target f1ap
 [100%] Built target e1ap
