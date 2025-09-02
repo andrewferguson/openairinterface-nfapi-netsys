@@ -419,6 +419,7 @@ static int nr_ue_process_dci_ul_00(module_id_t module_id,
   // in which ULSCH should be scheduled. K2 is configured in RRC configuration.
   // todo:
   // - SUL_IND_0_0
+  // printf("[%d.%d] processing dci ul 00 \n", frame, slot);
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
 
   // Schedule PUSCH
@@ -467,6 +468,7 @@ static int nr_ue_process_dci_ul_01(module_id_t module_id,
                                    dci_pdu_rel15_t *dci,
                                    fapi_nr_dci_indication_pdu_t *dci_ind)
 {
+    // printf("[%d.%d] processing dci ul 01 \n", frame, slot);
   /*
    *  with CRC scrambled by C-RNTI or CS-RNTI or SP-CSI-RNTI or new-RNTI
    *    0  IDENTIFIER_DCI_FORMATS:
@@ -619,6 +621,10 @@ static int nr_ue_process_dci_dl_10(module_id_t module_id,
         mac->type0_PDCCH_CSS_config.num_rbs ? mac->type0_PDCCH_CSS_config.num_rbs : mac->sc_info.initial_dl_BWPSize;
     dlsch_pdu->BWPStart = dci_ind->cset_start;
   } else {
+    if (current_DL_BWP == NULL) {
+      LOG_W(MAC, "No current DL BWP configured. Cannot process DCI in frame %d slot %d\n", frame, slot);
+      return -1;
+    }
     dlsch_pdu->BWPSize = current_DL_BWP->BWPSize;
     dlsch_pdu->BWPStart = current_DL_BWP->BWPStart;
   }
@@ -702,7 +708,7 @@ static int nr_ue_process_dci_dl_10(module_id_t module_id,
   dlsch_pdu->mcs_table = (pdsch_config) ? ((pdsch_config->mcs_Table) ? (*pdsch_config->mcs_Table + 1) : 0) : 0;
   /* MCS */
   dlsch_pdu->mcs = dci->mcs;
-
+   LOG_D(NR_MAC,"dci->mcs %d, dlsch_pdu->mcs %d\n", dci->mcs, dlsch_pdu->mcs);
   dlsch_pdu->qamModOrder = nr_get_Qm_dl(dlsch_pdu->mcs, dlsch_pdu->mcs_table);
   if (dlsch_pdu->qamModOrder == 0) {
     LOG_W(MAC, "Invalid code rate or Mod order, likely due to unexpected DL DCI.\n");
@@ -978,12 +984,14 @@ static int nr_ue_process_dci_dl_11(module_id_t module_id,
   dlsch_pdu->zp_csi_rs_trigger = dci->zp_csi_rs_trigger.val;
   /* MCS (for transport block 1)*/
   dlsch_pdu->mcs = dci->mcs;
+  LOG_D(NR_MAC,"dci->mcs %d, dlsch_pdu->mcs %d\n", dci->mcs, dlsch_pdu->mcs);
   /* NDI (for transport block 1)*/
   dlsch_pdu->ndi = dci->ndi;
   /* RV (for transport block 1)*/
   dlsch_pdu->rv = dci->rv;
   /* MCS (for transport block 2)*/
   dlsch_pdu->tb2_mcs = dci->mcs2.val;
+  LOG_D(NR_MAC,"dci->mcs2 %d, dlsch_pdu->tb2_mcs %d\n", dci->mcs2.val, dlsch_pdu->tb2_mcs);
   /* NDI (for transport block 2)*/
   dlsch_pdu->tb2_ndi = dci->ndi2.val;
   /* RV (for transport block 2)*/
@@ -2276,8 +2284,11 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
                 current_harq->active = false;
                 current_harq->ack_received = false;
               } else {
-                LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed\n", dl_harq_pid);
-                ack_data[code_word][dai_current - 1] = 0;
+                LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed for now marking as compelete \n", dl_harq_pid);
+                ack_data[code_word][dai_current - 1] = current_harq->ack;
+                current_harq->active = false;
+                current_harq->ack_received = false;
+               // ack_data[code_word][dai_current - 1] = 0;
               }
               dai[code_word][dai_current - 1] = current_harq->dai + 1;
               int temp_ind = current_harq->pucch_resource_indicator;
@@ -2293,6 +2304,12 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
             }
           }
         }
+        else {
+         // printf("HARQ pid %d is active for %d.%d\n",  dl_harq_pid, current_harq->ul_frame, current_harq->ul_slot);
+        }
+      }
+      else {
+       // printf( "HARQ pid %d is not active for %d.%d\n", dl_harq_pid, current_harq->ul_frame, current_harq->ul_slot);
       }
     }
   }
@@ -2715,7 +2732,9 @@ uint8_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
             static const uint8_t mcs_to_cqi[] = {0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
                                                  10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15};
             CHECK_INDEX(nr_bler_data, NR_NUM_MCS - 1);
+            
             int mcs = get_mcs_from_sinr(nr_bler_data, (mac->nr_ue_emul_l1.cqi - 640) * 0.1);
+            // printf("mcs = %d, cqi = %d\n", mcs, mac->nr_ue_emul_l1.cqi);
             CHECK_INDEX(mcs_to_cqi, mcs);
             mac->csirs_measurements.rank_indicator = mac->nr_ue_emul_l1.ri;
             mac->csirs_measurements.i1 = mac->nr_ue_emul_l1.pmi;
@@ -2841,7 +2860,7 @@ void nr_ue_send_sdu(nr_downlink_indication_t *dl_info, int pdu_id)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_IN);
 
-  LOG_D(MAC, "In [%d.%d] Handling DLSCH PDU type %d\n",
+  LOG_I(NR_MAC, "In [%d.%d] Handling DLSCH PDU type %d\n",
         dl_info->frame, dl_info->slot, dl_info->rx_ind->rx_indication_body[pdu_id].pdu_type);
 
   // Processing MAC PDU
@@ -3582,6 +3601,7 @@ void nr_ue_process_mac_pdu(nr_downlink_indication_t *dl_info,
   frame_t frameP         = dl_info->frame;
   int slot               = dl_info->slot;
   uint8_t *pduP          = (dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu.pdu;
+  //  pdu length 
   int32_t pdu_len        = (int32_t)(dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu.pdu_length;
   uint8_t gNB_index      = dl_info->gNB_index;
   uint8_t CC_id          = dl_info->cc_id;
@@ -3593,13 +3613,13 @@ void nr_ue_process_mac_pdu(nr_downlink_indication_t *dl_info,
     return;
   }
 
-  LOG_D(MAC, "In %s [%d.%d]: processing PDU %d (with length %d) of %d total number of PDUs...\n", __FUNCTION__, frameP, slot, pdu_id, pdu_len, dl_info->rx_ind->number_pdus);
+  LOG_I(NR_MAC, "In %s [%d.%d]: processing PDU %d (with length %d) of %d total number of PDUs...\n", __FUNCTION__, frameP, slot, pdu_id, pdu_len, dl_info->rx_ind->number_pdus);
 
   while (!done && pdu_len > 0){
     uint16_t mac_len = 0x0000;
     uint16_t mac_subheader_len = 0x0001; //  default to fixed-length subheader = 1-oct
+    //  Check if the PDU is long enough to contain a MAC subheader
     uint8_t rx_lcid = ((NR_MAC_SUBHEADER_FIXED *)pduP)->LCID;
-
     LOG_D(MAC, "[UE] LCID %d, PDU length %d\n", rx_lcid, pdu_len);
     bool ret;
     switch(rx_lcid){

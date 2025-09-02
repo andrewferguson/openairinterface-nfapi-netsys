@@ -25,7 +25,8 @@
 
 slot_rnti_mcs_s slot_rnti_mcs[NUM_NFAPI_SLOT];
 void read_channel_param(const nfapi_nr_dl_tti_pdsch_pdu_rel15_t * pdu, int slot, int index)
-{
+{ 
+  // printf("read channel called called \n");
   if (pdu == NULL)
   {
     LOG_E(NR_MAC,"PDU NULL\n");
@@ -46,6 +47,7 @@ void read_channel_param(const nfapi_nr_dl_tti_pdsch_pdu_rel15_t * pdu, int slot,
   CHECK_INDEX(slot_rnti_mcs[slot].drop_flag, index);
   slot_rnti_mcs[slot].rnti[index] = pdu->rnti;
   slot_rnti_mcs[slot].mcs[index] = pdu->mcsIndex[0];
+  printf("slot %d index %d rnti %x mcs %d\n", slot, index, slot_rnti_mcs[slot].rnti[index], slot_rnti_mcs[slot].mcs[index]);
   slot_rnti_mcs[slot].rvIndex[index] = pdu->rvIndex[0];
   slot_rnti_mcs[slot].drop_flag[index] = false;
   slot_rnti_mcs[slot].num_pdus = index+1; //index starts at 0 so we incrament to get num of pdus

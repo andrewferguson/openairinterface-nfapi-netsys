@@ -501,6 +501,7 @@ uint32_t pusharray8(uint8_t in[], uint32_t max_len, uint32_t len, uint8_t **out,
     (*out)+=len;
     return sizeof(uint8_t) * len;
   } else {
+    printf("Trying to push %u bytes, buffer remaining: %ld bytes\n", len, end - *out);
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
     on_error();
     return 0;

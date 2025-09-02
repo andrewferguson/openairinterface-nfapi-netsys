@@ -153,7 +153,9 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_T(NR_MAC, "RACH header id :%d\n", UL_INFO->rach_ind.header.message_id);
+        LOG_I(NR_MAC, "[%d.%d] RACH header id :%d\n", UL_INFO->frame,   UL_INFO->slot, UL_INFO->rach_ind.header.message_id);
+        
+        
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->rach_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
         {
@@ -163,24 +165,27 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
 
         LOG_D(NR_MAC, "NR_RACH_IND sent to Proxy, Size: %d Frame %d Slot %d Num PDUS %d\n", encoded_size,
                 UL_INFO->rach_ind.sfn, UL_INFO->rach_ind.slot, UL_INFO->rach_ind.number_of_pdus);
+      //  printf( "[%d.%d] NR_RACH_IND sent to Proxy :%d\n",UL_INFO->rach_ind.sfn,   UL_INFO->rach_ind.slot);
         if (send(ue_tx_sock_descriptor, buffer, encoded_size, 0) < 0)
         {
                 LOG_E(NR_MAC, "Send Proxy NR_UE failed\n");
                 return;
+
         }
         break;
     }
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_T(NR_MAC, "RX header id :%d\n", UL_INFO->rx_ind.header.message_id);
+        LOG_I(NR_MAC, "RX header id :%d\n", UL_INFO->rx_ind.header.message_id);
+        
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->rx_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
         {
                 LOG_E(NR_MAC, "nfapi_nr_p7_message_pack has failed. Encoded size = %d\n", encoded_size);
                 return;
         }
-
+        // printf("[%d.%d] NR_RX_IND sent to Proxy \n", UL_INFO->rx_ind.sfn,   UL_INFO->rx_ind.slot);
         LOG_D(NR_MAC, "NR_RX_IND sent to Proxy, Size: %d Frame %d Slot %d Num PDUS %d\n", encoded_size,
                 UL_INFO->rx_ind.sfn, UL_INFO->rx_ind.slot, UL_INFO->rx_ind.number_of_pdus);
         if (send(ue_tx_sock_descriptor, buffer, encoded_size, 0) < 0)
@@ -193,14 +198,15 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_T(NR_MAC, "CRC header id :%d\n", UL_INFO->crc_ind.header.message_id);
+        LOG_I(NR_MAC, "CRC header id :%d\n", UL_INFO->crc_ind.header.message_id);
+        
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->crc_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
         {
                 LOG_E(NR_MAC, "nfapi_nr_p7_message_pack has failed. Encoded size = %d\n", encoded_size);
                 return;
         }
-
+        //  printf( "[%d.%d] NR_CRC_IND sent to Proxy \n", UL_INFO->crc_ind.sfn,   UL_INFO->crc_ind.slot);
         LOG_D(NR_MAC, "NR_CRC_IND sent to Proxy, Size: %d Frame %d Slot %d Num PDUS %d\n", encoded_size,
                 UL_INFO->crc_ind.sfn, UL_INFO->crc_ind.slot, UL_INFO->crc_ind.number_crcs);
         if (send(ue_tx_sock_descriptor, buffer, encoded_size, 0) < 0)
@@ -213,14 +219,15 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_D(NR_MAC, "UCI header id :%d\n", UL_INFO->uci_ind.header.message_id);
+        LOG_I(NR_MAC, "UCI header id :%d\n", UL_INFO->uci_ind.header.message_id);
+        
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->uci_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
         {
                 LOG_E(NR_MAC, "nfapi_nr_p7_message_pack has failed. Encoded size = %d\n", encoded_size);
                 return;
         }
-
+        // printf("[%d.%d] NR_UCI_IND sent to Prox \n", UL_INFO->uci_ind.sfn,   UL_INFO->uci_ind.slot);
         LOG_D(NR_MAC, "NR_UCI_IND sent to Proxy, Size: %d Frame %d Slot %d Num PDUS %d\n", encoded_size,
                 UL_INFO->uci_ind.sfn, UL_INFO->uci_ind.slot, UL_INFO->uci_ind.num_ucis);
         if (send(ue_tx_sock_descriptor, buffer, encoded_size, 0) < 0)
@@ -236,6 +243,7 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
         LOG_T(NR_MAC, "Slot header id :%d\n", UL_INFO->slot_ind.header.message_id);
+     
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->slot_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
         {
@@ -266,49 +274,76 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
   {
     case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
     {
+
       nfapi_nr_rach_indication_t *ind = candidate;
+            LOG_I(NR_MAC, "matching for rach indication [%d.%d]: [%d.%d] \n", 
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+            NFAPI_SFNSLOT2SFN(((nfapi_nr_rach_indication_t *)candidate)->sfn),
+            NFAPI_SFNSLOT2SLOT(((nfapi_nr_rach_indication_t *)candidate)->slot));
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
     {
+
       nfapi_nr_rx_data_indication_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for rx data indication [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+             ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
     {
       nfapi_nr_crc_indication_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for crc indication [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+            ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     {
       nfapi_nr_uci_indication_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for uci indication [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+             ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
     {
       nfapi_nr_dl_tti_request_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for dl tti request [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+            ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST:
     {
       nfapi_nr_tx_data_request_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for tx data request [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+            ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST:
     {
       nfapi_nr_ul_dci_request_t *ind = candidate;
+      LOG_I(NR_MAC, "matching for ul dci request [%d.%d]: [%d.%d] \n",
+            NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+            ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
     }
 
     case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
     {
       nfapi_nr_ul_tti_request_t *ind = candidate;
+      // LOG_I(NR_MAC, "matching for ul tti request [%d.%d]: [%d.%d] \n",
+      //       NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
+      //       ind->SFN, ind->Slot);
       if(NFAPI_SFNSLOT2SFN(sfn_sf) == -1 )
         return false; // Match all SFN/SLOTs if SFN is -1 (used for NSA mode)
       else
@@ -319,14 +354,14 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
       LOG_E(NR_MAC, "sfn_slot_match bad ID: %d\n", msg->message_id);
 
   }
-
+  
   return false;
 }
 
 static void fill_dl_info_with_pdcch(fapi_nr_dci_indication_t *dci, nfapi_nr_dl_dci_pdu_t *rx_dci, int idx)
 {
     int num_bytes = (rx_dci->PayloadSizeBits + 7) / 8;
-    LOG_D(NR_PHY, "[%d, %d] PDCCH DCI (Payload) for rnti %x with PayloadSizeBits %d, num_bytes %d\n",
+    LOG_D(NR_MAC, "[%d, %d] PDCCH DCI (Payload) for rnti %x with PayloadSizeBits %d, num_bytes %d\n",
           dci->SFN, dci->slot, rx_dci->RNTI, rx_dci->PayloadSizeBits, num_bytes);
     for (int k = 0; k < num_bytes; k++)
     {
@@ -391,6 +426,8 @@ static bool is_my_dci(NR_UE_MAC_INST_t *mac, nfapi_nr_dl_dci_pdu_t *received_pdu
       return false;
     if (received_pdu->RNTI != 0x10b && mac->ra.ra_state == WAIT_RAR)
       return false;
+    // if (received_pdu->RNTI != 0x7f && mac->ra.ra_state == WAIT_RAR)
+    //   return false;
     if (received_pdu->RNTI != 0xFFFF && mac->ra.ra_state <= GENERATE_PREAMBLE)
       return false;
   }
@@ -416,13 +453,13 @@ static void copy_dl_tti_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi_
         nfapi_nr_dl_tti_request_pdu_t *pdu_list = &dl_tti_request->dl_tti_request_body.dl_tti_pdu_list[i];
         if (pdu_list->PDUType == NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE)
         {
-            LOG_D(NR_PHY, "[%d, %d] PDSCH PDU for rnti %x\n",
+            LOG_I(NR_MAC, "[%d, %d] PDSCH PDU for rnti %x\n",
                 dl_tti_request->SFN, dl_tti_request->Slot, pdu_list->pdsch_pdu.pdsch_pdu_rel15.rnti);
         }
 
         if (pdu_list->PDUType == NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE)
         {
-            LOG_D(NR_PHY, "[%d, %d] PDCCH DCI PDU (Format for incoming PDSCH PDU)\n",
+            LOG_D(NR_MAC, "[%d, %d] PDCCH DCI PDU (Format for incoming PDSCH PDU)\n",
                 dl_tti_request->SFN, dl_tti_request->Slot);
             uint16_t num_dcis = pdu_list->pdcch_pdu.pdcch_pdu_rel15.numDlDci;
             if (num_dcis > 0)
@@ -457,14 +494,16 @@ static void copy_dl_tti_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi_
                     }
                     else
                     {
+                       LOG_D(NR_MAC," Received DCI with RNTI %x\n",
+                             dci_pdu_list->RNTI);
                         mac->nr_ue_emul_l1.expected_dci = true;
                         mac->nr_ue_emul_l1.index_has_dci[j] = true;
                         LOG_T(NR_MAC, "Setting index_has_dci[%d] = true\n", j);
                     }
                     pdu_idx++;
                 }
-            }
-        }
+              }
+         }
         if (pdu_list->PDUType == NFAPI_NR_DL_TTI_SSB_PDU_TYPE)
         {
             /* If we get a MIB, we want to handle it right away and then come back.
@@ -521,7 +560,8 @@ static void fill_rx_ind(nfapi_nr_pdu_t *pdu_list, fapi_nr_rx_indication_t *rx_in
     rx_ind->rx_indication_body[pdu_idx].pdsch_pdu.ack_nack = ack_nack;
     rx_ind->rx_indication_body[pdu_idx].pdsch_pdu.pdu_length = length;
     rx_ind->rx_indication_body[pdu_idx].pdu_type = pdu_type;
-
+    LOG_D(NR_PHY, "%s: pdu_length %d, pdu_type %d\n",
+          __FUNCTION__, length, pdu_type);
 }
 
 
@@ -543,8 +583,12 @@ static void copy_tx_data_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi
     int pdu_idx = 0;
 
     for (int i = 0; i < num_pdus; i++)
-    {
-        nfapi_nr_pdu_t *pdu_list = &tx_data_request->pdu_list[i];
+    {    nfapi_nr_pdu_t *pdu_list = &tx_data_request->pdu_list[i];
+        if(i==0  && num_pdus==2){
+          // fill_rx_ind(pdu_list, rx_ind, pdu_idx, FAPI_NR_RX_PDU_TYPE_SIB);
+          // pdu_idx++;
+          continue;
+        }
         if (mac->nr_ue_emul_l1.index_has_sib[i])
         {
             AssertFatal(!get_softmodem_params()->nsa,
@@ -622,49 +666,67 @@ static bool send_crc_ind_and_rx_ind(int sfn_slot)
 
   nfapi_nr_rx_data_indication_t *rx_ind = unqueue_matching(&nr_rx_ind_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &sfn_slot);
   nfapi_nr_crc_indication_t *crc_ind = unqueue_matching(&nr_crc_ind_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &sfn_slot);
-
-  if (crc_ind && crc_ind->number_crcs > 0)
-  {
-    NR_UE_MAC_INST_t *mac = get_mac_inst(0);
-    for (int i = 0; i < crc_ind->number_crcs; i++) {
-        int harq_pid = crc_ind->crc_list[i].harq_id;
-        LOG_T(NR_MAC, "Resetting harq_pid %d active_ul_harq_sfn_slot\n", harq_pid);
-        mac->nr_ue_emul_l1.harq[harq_pid].active_ul_harq_sfn_slot = -1;
-    }
-    NR_UL_IND_t UL_INFO = {
-      .crc_ind = *crc_ind,
-    };
-    send_nsa_standalone_msg(&UL_INFO, crc_ind->header.message_id);
-    free(crc_ind->crc_list);
-    free(crc_ind);
+  if (rx_ind == NULL && crc_ind == NULL) {
+    LOG_I(NR_MAC, "[%d.%d]No CRC or RX indication to send\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
+    return false;
   }
-  if (rx_ind && rx_ind->number_of_pdus > 0)
-  {
+  if (rx_ind == NULL && crc_ind != NULL) {
+    LOG_I(NR_MAC, "[%d.%d]No RX indication to send, sending CRC indication only\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
+  } else if (rx_ind != NULL && crc_ind == NULL) {
+    LOG_I(NR_MAC, "[%d.%d]No CRC indication to send, sending RX indication only\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
+  } else {
+    LOG_I(NR_MAC, "[%d.%d]Sending both CRC and RX indications\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
+  }
+
+
+
+  if ((crc_ind && crc_ind->number_crcs > 0)&& (rx_ind && rx_ind->number_of_pdus > 0))
+    {  
+
     NR_UL_IND_t UL_INFO = {
       .rx_ind = *rx_ind,
     };
     send_nsa_standalone_msg(&UL_INFO, rx_ind->header.message_id);
     free(rx_ind->pdu_list);
     free(rx_ind);
-  }
+
+      NR_UE_MAC_INST_t *mac = get_mac_inst(0);
+      for (int i = 0; i < crc_ind->number_crcs; i++) {
+          int harq_pid = crc_ind->crc_list[i].harq_id;
+          LOG_T(NR_MAC, "Resetting harq_pid %d active_ul_harq_sfn_slot\n", harq_pid);
+          mac->nr_ue_emul_l1.harq[harq_pid].active_ul_harq_sfn = -1;
+          mac->nr_ue_emul_l1.harq[harq_pid].active_ul_harq_slot = -1;
+      }
+      NR_UL_IND_t UL_INFO2 = {
+        .crc_ind = *crc_ind,
+      };
+      send_nsa_standalone_msg(&UL_INFO2, crc_ind->header.message_id);
+      free(crc_ind->crc_list);
+      free(crc_ind);
+    }
   else
-  {
-    sent_crc_rx = false;
-  }
-  return sent_crc_rx;
+    {
+      LOG_E(NR_MAC, "[%d.%d]No RX indication to send rx_ind->number_of_pdus :  %d \n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot), rx_ind->number_of_pdus);
+      sent_crc_rx = false;
+      return sent_crc_rx;
+    }
+  
+ return sent_crc_rx;
 }
 
 static void copy_ul_tti_data_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi_nr_ul_tti_request_t *ul_tti_req)
 {
     int num_pdus = ul_tti_req->n_pdus;
+
     int sfn_slot = NFAPI_SFNSLOT2HEX(ul_tti_req->SFN, ul_tti_req->Slot);
+    // printf("[%d.%d] UL_TTI_REQUEST for SFN this is going to send crc ind \n", ul_tti_req->SFN, ul_tti_req->Slot);
     AssertFatal(num_pdus >= 0, "Invalid ul_tti_request number of PDUS\n");
     AssertFatal(num_pdus <= sizeof(ul_tti_req->pdus_list) / sizeof(ul_tti_req->pdus_list[0]),
                 "Too many pdus %d in ul_tti_req\n", num_pdus);
 
     if (!send_crc_ind_and_rx_ind(sfn_slot))
     {
-        LOG_T(NR_MAC, "CRC_RX ind not sent\n");
+        LOG_I(NR_MAC, "CRC_RX ind not sent\n");
         if (!put_queue(&nr_ul_tti_req_queue, ul_tti_req))
         {
             LOG_E(NR_PHY, "put_queue failed for ul_tti_req.\n");
@@ -758,7 +820,7 @@ void check_and_process_dci(nfapi_nr_dl_tti_request_t *dl_tti_request,
     else if (ul_tti_request) {
         frame = ul_tti_request->SFN;
         slot = ul_tti_request->Slot;
-        LOG_T(NR_PHY, "[%d, %d] ul_tti_request\n", frame, slot);
+        LOG_I(NR_PHY, "[%d, %d] ul_tti_request\n", frame, slot);
         copy_ul_tti_data_req_to_dl_info(&mac->dl_info, ul_tti_request);
     }
     else {
@@ -778,8 +840,7 @@ void check_and_process_dci(nfapi_nr_dl_tti_request_t *dl_tti_request,
     if (pthread_mutex_unlock(&mac->mutex_dl_info))
       abort();
     int slots_per_frame = 20; //30 kHZ subcarrier spacing
-    int slot_ahead = 2; // TODO: Make this dynamic
-
+    int slot_ahead = 3; // TODO: Make this dynamic
     if (is_nr_UL_slot(mac->tdd_UL_DL_ConfigurationCommon,
                       (slot + slot_ahead) % slots_per_frame,
                       mac->frame_type)
@@ -790,6 +851,9 @@ void check_and_process_dci(nfapi_nr_dl_tti_request_t *dl_tti_request,
             .slot_rx = slot,
             .slot_tx = (slot + slot_ahead) % slots_per_frame,
             .frame_tx = (ul_info.slot_rx + slot_ahead >= slots_per_frame) ? ul_info.frame_rx + 1 : ul_info.frame_rx};
+     // printf("[%d, %d] nr_ue_ul_scheduler\n", ul_info.frame_tx, ul_info.slot_tx);
+      //printf("[%d, %d] nr_ue_ul_scheduler\n", ul_info.frame_rx, ul_info.slot_rx);
+      
       nr_ue_ul_scheduler(&ul_info);
     }
 }
@@ -833,6 +897,7 @@ void save_nr_measurement_info(nfapi_nr_dl_tti_request_t *dl_tti_request)
 
 static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_header_t header)
 {
+     static int once = 0;
     NR_UE_MAC_INST_t *mac = get_mac_inst(0);
     switch (header.message_id)
     {
@@ -845,8 +910,10 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 LOG_E(NR_PHY, "Message dl_tti_request failed to unpack\n");
                 break;
             }
-            LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST message in sfn/slot %d %d. \n",
-                    dl_tti_request->SFN, dl_tti_request->Slot);
+            // printf("[%d.%d] Recevied dl tti request \n", dl_tti_request->SFN, dl_tti_request->Slot);
+             LOG_I(NR_PHY, "[%d.%d]nr dl tti request queue size %d. \n",
+                        dl_tti_request->SFN, dl_tti_request->Slot, nr_dl_tti_req_queue.num_items);
+
 
             if (is_channel_modeling())
                 save_pdsch_pdu_for_crnti(dl_tti_request);
@@ -869,8 +936,9 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 LOG_E(NR_PHY, "Message tx_data_request failed to unpack\n");
                 break;
             }
-            LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST message in SFN/slot %d %d. \n",
-                    tx_data_request->SFN, tx_data_request->Slot);
+            // printf("[%d.%d] Recevied tx data request \n",   tx_data_request->SFN, tx_data_request->Slot);
+           LOG_I(NR_PHY, "[%d.%d]tx data request queue size %d. \n",
+                        tx_data_request->SFN, tx_data_request->Slot, nr_tx_req_queue.num_items);
             if (!put_queue(&nr_tx_req_queue, tx_data_request))
             {
                 LOG_E(NR_PHY, "put_queue failed for tx_request.\n");
@@ -889,6 +957,8 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 LOG_E(NR_PHY, "Message ul_dci_request failed to unpack\n");
                 break;
             }
+          LOG_I(NR_PHY, "Ul dci request queue size %d. \n",
+                        nr_ul_dci_req_queue.num_items);
             LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST message in SFN/slot %d %d. \n",
                     ul_dci_request->SFN, ul_dci_request->Slot);
             if (!put_queue(&nr_ul_dci_req_queue, ul_dci_request))
@@ -909,15 +979,28 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                 LOG_E(NR_PHY, "Message ul_tti_request failed to unpack\n");
                 break;
             }
-            LOG_I(NR_PHY, "Ul tti request queue size %d. \n",
-                        nr_ul_tti_req_queue.num_items);
+            
+            LOG_I(NR_PHY, "[%d.%d]Ul tti request queue size %d. \n", ul_tti_request->SFN, ul_tti_request->Slot,
+                   nr_ul_tti_req_queue.num_items);
             /* We are filtering UL_TTI_REQs below. We only care about UL_TTI_REQs that
                will trigger sending a ul_harq (CRC/RX pair). This UL_TTI_REQ will have
                NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE. If we have not yet completed the CBRA/
                CFRA procedure, we need to queue all UL_TTI_REQs. */
+
+            if( mac->ra.ra_state >= RA_SUCCEEDED)
+            {
+                while(nr_ul_tti_req_queue.num_items > 0 ){
+                    nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = unqueue(&nr_ul_tti_req_queue);
+                    free(evicted_ul_tti_req);
+                    
+                }
+                
+            }
+
             for (int i = 0; i < ul_tti_request->n_pdus; i++) {
                 if (ul_tti_request->pdus_list[i].pdu_type == NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE &&
                     mac->ra.ra_state >= RA_SUCCEEDED) {
+                    
                     if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
                     {
                         LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
@@ -927,6 +1010,9 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                     break;
                 }
                 else if (mac->ra.ra_state < RA_SUCCEEDED) {
+                    LOG_I(NR_PHY, "RA not succeeded, queuing ul_tti_request.\n");
+                    if(nr_ul_tti_req_queue.num_items == 5)
+                        unqueue(&nr_ul_tti_req_queue);
                     if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
                     {
                         LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
@@ -1152,8 +1238,9 @@ void update_harq_status(module_id_t module_id, uint8_t harq_pid, uint8_t ack_nac
   if (current_harq->active) {
     LOG_D(PHY,"Updating harq_status for harq_id %d, ack/nak %d\n", harq_pid, current_harq->ack);
     // we can prepare feedback for MSG4 in advance
-    if (mac->ra.ra_state == WAIT_CONTENTION_RESOLUTION)
+    if (mac->ra.ra_state == WAIT_CONTENTION_RESOLUTION){
       prepare_msg4_feedback(mac, harq_pid, ack_nack);
+    }
     else {
       current_harq->ack = ack_nack;
       current_harq->ack_received = true;
@@ -1189,7 +1276,7 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
   pthread_mutex_lock(&mac_IF_mutex);
   uint32_t ret_mask = 0x0;
   module_id_t module_id = dl_info->module_id;
-  LOG_D(NR_MAC, "In %s():%d module_id %d, frame %d, slot %d\n",
+  LOG_T(NR_MAC, "In %s():%d module_id %d, frame %d, slot %d\n",
         __FUNCTION__, __LINE__, module_id, dl_info->frame, dl_info->slot);
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   if ((!dl_info->dci_ind && !dl_info->rx_ind)) {

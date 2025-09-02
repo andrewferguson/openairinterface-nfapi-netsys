@@ -595,7 +595,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
       ra_rnti = 1 + symbol + (9 /*slotP*/ * 14) + (freq_index * 14 * 80) + (ul_carrier_id * 14 * 80 * 8);
     else
       ra_rnti = 1 + symbol + (slotP * 14) + (freq_index * 14 * 80) + (ul_carrier_id * 14 * 80 * 8);
-
+     LOG_I(NR_MAC, "Computed ra_RNTI is %x \n", ra_rnti);
     // Configure RA BWP
     configure_UE_BWP(nr_mac, scc, NULL, ra, NULL, -1, -1);
 

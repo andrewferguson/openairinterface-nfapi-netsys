@@ -150,13 +150,13 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             nfapi_nr_rx_data_indication_t *rx_ind = CALLOC(1, sizeof(*rx_ind));
             nfapi_nr_crc_indication_t *crc_ind = CALLOC(1, sizeof(*crc_ind));
             nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu = &ul_config->ul_config_list[i].pusch_config_pdu;
-            if (scheduled_response->tx_request) {
+            if (scheduled_response->tx_request && scheduled_response->tx_request->number_of_pdus > 0) {
               AssertFatal(scheduled_response->tx_request->number_of_pdus <
                           sizeof(scheduled_response->tx_request->tx_request_body) / sizeof(scheduled_response->tx_request->tx_request_body[0]),
                           "Too many tx_req pdus %d", scheduled_response->tx_request->number_of_pdus);
               rx_ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION;
               rx_ind->sfn = scheduled_response->ul_config->sfn;
-              rx_ind->slot = scheduled_response->ul_config->slot;
+              rx_ind->slot = scheduled_response->ul_config->slot; 
               rx_ind->number_of_pdus = scheduled_response->tx_request->number_of_pdus;
               rx_ind->pdu_list = CALLOC(rx_ind->number_of_pdus, sizeof(*rx_ind->pdu_list));
               for (int j = 0; j < rx_ind->number_of_pdus; j++) {
@@ -171,7 +171,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                    we hard code the values below since they are set in L1 and we are
                    abstracting L1. */
                 rx_ind->pdu_list[j].timing_advance = 31;
-                rx_ind->pdu_list[j].ul_cqi = 255;
+                rx_ind->pdu_list[j].ul_cqi = 15;
               }
 
               crc_ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION;
@@ -190,11 +190,22 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                 crc_ind->crc_list[j].tb_crc_status = 0;
                 crc_ind->crc_list[j].timing_advance = 31;
                 crc_ind->crc_list[j].ul_cqi = 255;
-                if(mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_sfn_slot == -1){
-                            printf("We did not send an active CRC when we should have!\n");
-                  continue;
-                  }
+                // if(mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_sfn == -1 &&
+                //             mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_slot == -1)
+                //           // printf("[%d.%d] We did not send an active CRC when we should have!\n",crc_ind->sfn, crc_ind->slot );
+                        
+                // else{
+                //   // printf(" [%d.%d] We sent an active CRC when we should have!\n", mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_dl_harq_sfn, mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_dl_harq_slot);
+                // }
+                mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_sfn = crc_ind->sfn;
+                mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_slot = crc_ind->slot;
                 mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_sfn_slot = NFAPI_SFNSLOT2HEX(crc_ind->sfn, crc_ind->slot);
+                LOG_I(NR_PHY, "SENT CRC: harq_id=%d sfn=%d slot=%d rnti=0x%x tb_crc_status=%d\n",
+                    crc_ind->crc_list[j].harq_id,
+                    crc_ind->sfn,
+                    crc_ind->slot,
+                    crc_ind->crc_list[j].rnti,
+                    crc_ind->crc_list[j].tb_crc_status);
                 LOG_D(NR_MAC, "This is sched sfn/sl [%d %d] and crc sfn/sl [%d %d] with mcs_index in ul_cqi -> %d\n",
                       scheduled_response->frame, scheduled_response->slot, crc_ind->sfn, crc_ind->slot,pusch_config_pdu->mcs_index);
               }
@@ -205,18 +216,28 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                   free(rx_ind->pdu_list[i].pdu);
                   rx_ind->pdu_list[i].pdu = NULL;
                 }
-
+                
                 free(rx_ind->pdu_list);
                 rx_ind->pdu_list = NULL;
                 free(rx_ind);
                 rx_ind = NULL;
               }
+              else{
+                LOG_I(NR_MAC, "[%d.%d] Queued RX_IND Num of rx_ind %d \n", rx_ind->sfn, rx_ind->slot, rx_ind->number_of_pdus);
+              }
+
               if (!put_queue(&nr_crc_ind_queue, crc_ind)) {
                 LOG_E(NR_MAC, "Put_queue failed for crc_ind\n");
                 free(crc_ind->crc_list);
                 crc_ind->crc_list = NULL;
                 free(crc_ind);
                 crc_ind = NULL;
+              }
+              else{
+                      LOG_I(NR_PHY, "Queued CRC: harq_id=%d sfn=%d slot=%d", 
+                        crc_ind->crc_list[0].harq_id,
+                        crc_ind->sfn,
+                        crc_ind->slot);
               }
 
               LOG_D(PHY, "In %s: Filled queue rx/crc_ind which was filled by ulconfig. \n", __FUNCTION__);
@@ -225,6 +246,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             break;
           }
           case FAPI_NR_UL_CONFIG_TYPE_PUCCH: {
+            LOG_I(NR_MAC, "[%d.%d] In %s: Processing PUCCH PDU type FAPI_NR_UL_CONFIG_TYPE_PUCCH\n", scheduled_response->frame, scheduled_response->slot,  __FUNCTION__);
             nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
             uci_ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION;
             uci_ind->sfn = scheduled_response->frame;
@@ -232,14 +254,16 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             uci_ind->num_ucis = 1;
             uci_ind->uci_list = CALLOC(uci_ind->num_ucis, sizeof(*uci_ind->uci_list));
             for (int j = 0; j < uci_ind->num_ucis; j++) {
-              LOG_D(NR_MAC, "ul_config->ul_config_list[%d].pucch_config_pdu.n_bit = %d\n", i, ul_config->ul_config_list[i].pucch_config_pdu.n_bit);
+              LOG_I(NR_MAC, "[%d.%d]ul_config->ul_config_list[%d].pucch_config_pdu.n_bit = %d\n", scheduled_response->frame, scheduled_response->slot, i, ul_config->ul_config_list[i].pucch_config_pdu.n_bit);
               if (ul_config->ul_config_list[i].pucch_config_pdu.n_bit > 3 && mac->nr_ue_emul_l1.num_csi_reports > 0) {
                 uci_ind->uci_list[j].pdu_type = NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE;
                 uci_ind->uci_list[j].pdu_size = sizeof(nfapi_nr_uci_pucch_pdu_format_2_3_4_t);
                 nfapi_nr_uci_pucch_pdu_format_2_3_4_t *pdu_2_3_4 = &uci_ind->uci_list[j].pucch_pdu_format_2_3_4;
+                LOG_I(NR_MAC, "[%d.%d] Filling uci 2_3_4 \n ",uci_ind->sfn , uci_ind->slot  );
                 fill_uci_2_3_4(pdu_2_3_4, &ul_config->ul_config_list[i].pucch_config_pdu);
               }
               else {
+                LOG_I(NR_MAC, "[%d.%d] Filling uci 0_1 \n ",uci_ind->sfn , uci_ind->slot  );
                 nfapi_nr_uci_pucch_pdu_format_0_1_t *pdu_0_1 = &uci_ind->uci_list[j].pucch_pdu_format_0_1;
                 uci_ind->uci_list[j].pdu_type = NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE;
                 uci_ind->uci_list[j].pdu_size = sizeof(nfapi_nr_uci_pucch_pdu_format_0_1_t);
@@ -250,11 +274,14 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                 pdu_0_1->ul_cqi = 255;
                 pdu_0_1->timing_advance = 0;
                 pdu_0_1->rssi = 0;
+                LOG_I(NR_MAC, "[%d.%d] Filling pdu_0_1->pduBitmap MAC NUM_HARQ %d\n ",uci_ind->sfn , uci_ind->sfn, mac->nr_ue_emul_l1.num_harqs);  
                 if (mac->nr_ue_emul_l1.num_harqs > 0) {
+
                   int harq_index = 0;
                   pdu_0_1->pduBitmap = 2; // (value->pduBitmap >> 1) & 0x01) == HARQ and (value->pduBitmap) & 0x01) == SR
                   pdu_0_1->harq.num_harq = mac->nr_ue_emul_l1.num_harqs;
                   pdu_0_1->harq.harq_confidence_level = 0;
+                  // printf(" pdu_0_1->pduBitMap %d \n ", pdu_0_1->pduBitmap);
                   int harq_pid = -1;
                   for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++) {
                     if (mac->nr_ue_emul_l1.harq[k].active &&
@@ -262,9 +289,13 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                         mac->nr_ue_emul_l1.harq[k].active_dl_harq_slot == uci_ind->slot) {
                       mac->nr_ue_emul_l1.harq[k].active = false;
                       harq_pid = k;
+                      // printf("HARQ[%d][%d.%d] == [%d.%d] harq_index %d  num_harq %d \n", k, uci_ind->sfn, uci_ind->slot, mac->nr_ue_emul_l1.harq[k].active_dl_harq_sfn, mac->nr_ue_emul_l1.harq[k].active_dl_harq_slot, harq_index,mac->nr_ue_emul_l1.num_harqs);
                       AssertFatal(harq_index < pdu_0_1->harq.num_harq, "Invalid harq_index %d\n", harq_index);
                       pdu_0_1->harq.harq_list[harq_index].harq_value = !mac->dl_harq_info[k].ack;
                       harq_index++;
+                    }
+                    else{
+                      // printf("HARQ[%d][%d.%d] != [%d.%d]  and  active = %d\n", k, uci_ind->sfn, uci_ind->slot, mac->nr_ue_emul_l1.harq[k].active_dl_harq_sfn, mac->nr_ue_emul_l1.harq[k].active_dl_harq_slot, mac->nr_ue_emul_l1.harq[k].active);
                     }
                   }
                   AssertFatal(harq_pid != -1, "No active harq_pid, sfn_slot = %u.%u", uci_ind->sfn, uci_ind->slot);

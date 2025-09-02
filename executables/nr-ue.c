@@ -201,10 +201,15 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
     LOG_D(NR_MAC, "Try to get a ul_tti_req by matching CRC active SFN %d/SLOT %d from queue with %lu items\n",
             NFAPI_SFNSLOT2SFN(mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot),
             NFAPI_SFNSLOT2SLOT(mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot), nr_ul_tti_req_queue.num_items);
-    nfapi_nr_ul_tti_request_t *ul_tti_request_crc = unqueue_matching(&nr_ul_tti_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot);
+            int expected_sfn = NFAPI_SFNSLOT2SFN(mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot);
+            int expected_slot = NFAPI_SFNSLOT2SLOT(mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot);
+            // LOG_I(NR_MAC,"before nr_ul_tti_req_queue SIZE %d\n", nr_ul_tti_req_queue.num_items);
+            nfapi_nr_ul_tti_request_t *ul_tti_request_crc = unqueue_matching(&nr_ul_tti_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &mac->nr_ue_emul_l1.harq[i].active_ul_harq_sfn_slot);
+          // LOG_I(NR_MAC,"after nr_ul_tti_req_queue SIZE %d\n", nr_ul_tti_req_queue.num_items);
+    
     if (ul_tti_request_crc && ul_tti_request_crc->n_pdus > 0) {
       check_and_process_dci(NULL, NULL, NULL, ul_tti_request_crc);
-      free_and_zero(ul_tti_request_crc);
+     // free_and_zero(ul_tti_request_crc);
     }
   }
 
@@ -222,7 +227,17 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
   }
   if (dl_tti_request) {
     int dl_tti_sfn_slot = NFAPI_SFNSLOT2HEX(dl_tti_request->SFN, dl_tti_request->Slot);
-    nfapi_nr_tx_data_request_t *tx_data_request = unqueue_matching(&nr_tx_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &dl_tti_sfn_slot);
+       int check_count = 0;
+    nfapi_nr_tx_data_request_t *tx_data_request = NULL;
+    while(true) {
+       if(check_count !=0)
+        printf("[%d.%d] Checking tx_Data_request for %d times \n", NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot), check_count);
+        tx_data_request = unqueue_matching(&nr_tx_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &dl_tti_sfn_slot);
+        if(tx_data_request)
+          break;
+        usleep(10);
+         check_count++;
+    }
     if (!tx_data_request) {
       LOG_E(NR_MAC, "[%d %d] No corresponding tx_data_request for given dl_tti_request sfn/slot\n",
             NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot));
@@ -293,7 +308,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     frame_t frame = NFAPI_SFNSLOT2SFN(sfn_slot);
     int slot = NFAPI_SFNSLOT2SLOT(sfn_slot);
     if (sfn_slot == last_sfn_slot) {
-      LOG_D(NR_MAC, "repeated sfn_sf = %d.%d\n",
+      LOG_I(NR_MAC, "repeated sfn_sf = %d.%d\n",
             frame, slot);
       continue;
     }
@@ -301,7 +316,6 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
 
     LOG_D(NR_MAC, "The received sfn/slot [%d %d] from proxy\n",
           frame, slot);
-
     if (get_softmodem_params()->sa && mac->mib == NULL) {
       LOG_D(NR_MAC, "We haven't gotten MIB. Lets see if we received it\n");
       nr_ue_dl_indication(&mac->dl_info);
@@ -311,12 +325,13 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       LOG_D(NR_MAC, "SA %d MIB %p\n",
             get_softmodem_params()->sa, mac->mib);
       LOG_D(NR_MAC, "We have received MIB\n");
+
     }
     int CC_id = 0;
     uint8_t gNB_id = 0;
     nr_uplink_indication_t ul_info;
     int slots_per_frame = 20; //30 kHZ subcarrier spacing
-    int slot_ahead = 2; // TODO: Make this dynamic
+    int slot_ahead = 3; // TODO: Make this dynamic
     ul_info.cc_id = CC_id;
     ul_info.gNB_index = gNB_id;
     ul_info.module_id = mod_id;
@@ -324,6 +339,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     ul_info.slot_rx = slot;
     ul_info.slot_tx = (slot + slot_ahead) % slots_per_frame;
     ul_info.frame_tx = (ul_info.slot_rx + slot_ahead >= slots_per_frame) ? ul_info.frame_rx + 1 : ul_info.frame_rx;
+
 
     if (pthread_mutex_lock(&mac->mutex_dl_info)) abort();
 
@@ -333,7 +349,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       mac->nr_ue_emul_l1.cqi = ch_info->csi[0].cqi;
       free_and_zero(ch_info);
     }
-
+    mac->nr_ue_emul_l1.cqi = 15;
     if (is_nr_DL_slot(mac->tdd_UL_DL_ConfigurationCommon,
                       ul_info.slot_rx)) {
       memset(&mac->dl_info, 0, sizeof(mac->dl_info));
@@ -364,7 +380,10 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     ul_slot_ind->slot_ind.header.message_id = NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION;
     ul_slot_ind->slot_ind.slot= slot;
     ul_slot_ind->slot_ind.sfn = frame;
-
+    LOG_I(NR_MAC,"[%d.%d] Sending slot indication to PNF\n",
+          ul_slot_ind->slot_ind.sfn, ul_slot_ind->slot_ind.slot);
+    // printf("[%d.%d] Sending slot indication to PNF\n",
+    //       ul_slot_ind->slot_ind.sfn, ul_slot_ind->slot_ind.slot);
     send_nsa_standalone_msg(ul_slot_ind, NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION);
     free_and_zero(ul_slot_ind);
     LOG_D(NR_MAC, "Exiting NRUE_phy_stub_standalone_pnf_task\n");

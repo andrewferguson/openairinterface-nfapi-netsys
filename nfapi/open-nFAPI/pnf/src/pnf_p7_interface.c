@@ -28,7 +28,7 @@ nfapi_pnf_p7_config_t* nfapi_pnf_p7_config_create()
 
 
 	// set the default parameters
-	_this->_public.segment_size = 1400;
+	_this->_public.segment_size = 60000;
 	_this->max_num_segments = 8;
 	
 	_this->_public.subframe_buffer_size = 8;// TODO: Initialize the slot_buffer size
