@@ -177,7 +177,7 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_I(NR_MAC, "RX header id :%d\n", UL_INFO->rx_ind.header.message_id);
+        LOG_D(NR_MAC, "RX header id :%d\n", UL_INFO->rx_ind.header.message_id);
         
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->rx_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
@@ -198,7 +198,7 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_I(NR_MAC, "CRC header id :%d\n", UL_INFO->crc_ind.header.message_id);
+        LOG_D(NR_MAC, "CRC header id :%d\n", UL_INFO->crc_ind.header.message_id);
         
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->crc_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
@@ -219,7 +219,7 @@ void send_nsa_standalone_msg(NR_UL_IND_t *UL_INFO, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     {
         char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-        LOG_I(NR_MAC, "UCI header id :%d\n", UL_INFO->uci_ind.header.message_id);
+        LOG_D(NR_MAC, "UCI header id :%d\n", UL_INFO->uci_ind.header.message_id);
         
         int encoded_size = nfapi_nr_p7_message_pack(&UL_INFO->uci_ind, buffer, sizeof(buffer), NULL);
         if (encoded_size <= 0)
@@ -276,7 +276,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     {
 
       nfapi_nr_rach_indication_t *ind = candidate;
-            LOG_I(NR_MAC, "matching for rach indication [%d.%d]: [%d.%d] \n", 
+            LOG_D(NR_MAC, "matching for rach indication [%d.%d]: [%d.%d] \n", 
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
             NFAPI_SFNSLOT2SFN(((nfapi_nr_rach_indication_t *)candidate)->sfn),
             NFAPI_SFNSLOT2SLOT(((nfapi_nr_rach_indication_t *)candidate)->slot));
@@ -287,7 +287,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     {
 
       nfapi_nr_rx_data_indication_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for rx data indication [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for rx data indication [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
              ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
@@ -296,7 +296,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
     {
       nfapi_nr_crc_indication_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for crc indication [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for crc indication [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
             ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
@@ -305,7 +305,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     {
       nfapi_nr_uci_indication_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for uci indication [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for uci indication [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
              ind->sfn, ind->slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
@@ -314,7 +314,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
     {
       nfapi_nr_dl_tti_request_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for dl tti request [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for dl tti request [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
             ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
@@ -323,7 +323,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST:
     {
       nfapi_nr_tx_data_request_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for tx data request [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for tx data request [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
             ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
@@ -332,7 +332,7 @@ bool sfn_slot_matcher(void *wanted, void *candidate)
     case NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST:
     {
       nfapi_nr_ul_dci_request_t *ind = candidate;
-      LOG_I(NR_MAC, "matching for ul dci request [%d.%d]: [%d.%d] \n",
+      LOG_D(NR_MAC, "matching for ul dci request [%d.%d]: [%d.%d] \n",
             NFAPI_SFNSLOT2SFN(sfn_sf), NFAPI_SFNSLOT2SLOT(sfn_sf),
             ind->SFN, ind->Slot);
       return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->SFN && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->Slot;
@@ -453,7 +453,7 @@ static void copy_dl_tti_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi_
         nfapi_nr_dl_tti_request_pdu_t *pdu_list = &dl_tti_request->dl_tti_request_body.dl_tti_pdu_list[i];
         if (pdu_list->PDUType == NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE)
         {
-            LOG_I(NR_MAC, "[%d, %d] PDSCH PDU for rnti %x\n",
+            LOG_D(NR_MAC, "[%d, %d] PDSCH PDU for rnti %x\n",
                 dl_tti_request->SFN, dl_tti_request->Slot, pdu_list->pdsch_pdu.pdsch_pdu_rel15.rnti);
         }
 
@@ -670,13 +670,7 @@ static bool send_crc_ind_and_rx_ind(int sfn_slot)
     LOG_I(NR_MAC, "[%d.%d]No CRC or RX indication to send\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
     return false;
   }
-  if (rx_ind == NULL && crc_ind != NULL) {
-    LOG_I(NR_MAC, "[%d.%d]No RX indication to send, sending CRC indication only\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
-  } else if (rx_ind != NULL && crc_ind == NULL) {
-    LOG_I(NR_MAC, "[%d.%d]No CRC indication to send, sending RX indication only\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
-  } else {
-    LOG_I(NR_MAC, "[%d.%d]Sending both CRC and RX indications\n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
-  }
+
 
 
 
@@ -1083,7 +1077,7 @@ void *nrue_standalone_pnf_task(void *context)
   char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
 
   LOG_I(NR_RRC, "Successfully started %s.\n", __FUNCTION__);
-
+  
   while (true)
   {
     ssize_t len = recvfrom(sd, buffer, sizeof(buffer), MSG_TRUNC, (struct sockaddr *)&server_address, &addr_len);
@@ -1312,7 +1306,7 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
         ret_mask |= (ret << FAPI_NR_DCI_IND);
         AssertFatal( nr_ue_if_module_inst[module_id] != NULL, "IF module is NULL!\n" );
         AssertFatal( nr_ue_if_module_inst[module_id]->scheduled_response != NULL, "scheduled_response is NULL!\n" );
-        LOG_I(NR_MAC, "Calling get_dl_config_req %d\n", g_harq_pid);
+        LOG_D(NR_MAC, "Calling get_dl_config_req %d\n", g_harq_pid);
         fapi_nr_dl_config_request_t *dl_config = get_dl_config_request(mac, dl_info->slot);
         fill_scheduled_response(&scheduled_response, dl_config, NULL, NULL, dl_info->module_id, dl_info->cc_id, dl_info->frame, dl_info->slot, dl_info->phy_data);
         nr_ue_if_module_inst[module_id]->scheduled_response(&scheduled_response);

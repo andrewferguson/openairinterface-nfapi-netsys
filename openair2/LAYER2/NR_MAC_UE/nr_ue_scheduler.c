@@ -79,7 +79,7 @@ void fill_ul_config(fapi_nr_ul_config_request_t *ul_config, frame_t frame_tx, in
   ul_config->sfn = frame_tx;
   ul_config->number_pdus++;
 
-  LOG_I(NR_MAC, "In %s: Set config request for UL transmission in [%d.%d], number of UL PDUs: %d sending PDU type : %d \n", __FUNCTION__, ul_config->sfn, ul_config->slot, ul_config->number_pdus, pdu_type);
+  LOG_D(NR_MAC, "In %s: Set config request for UL transmission in [%d.%d], number of UL PDUs: %d sending PDU type : %d \n", __FUNCTION__, ul_config->sfn, ul_config->slot, ul_config->number_pdus, pdu_type);
   // printf("In %s: Set config request for UL transmission in [%d.%d], number of UL PDUs: %d sending PDU type : %d \n", __FUNCTION__, ul_config->sfn, ul_config->slot, ul_config->number_pdus, pdu_type);
 
 }
@@ -1028,7 +1028,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
         //  printf("[%d.%d] ul_info [%d.%d] vs ul_config [%d.%d] and num pdu %d \n", ul_info->frame_tx, ul_info->slot_tx,  ul_info->frame_tx, ul_info->slot_tx, ul_config->sfn, ul_config->slot, ul_config->number_pdus);
         if ((ul_info->slot_tx == ul_config->slot && ul_info->frame_tx == ul_config->sfn) && ul_config->number_pdus > 0)
         {
-          LOG_I(NR_MAC, "[%d.%d]: number of UL PDUs: %d with UL transmission in [%d.%d]\n", frame_tx, slot_tx, ul_config->number_pdus, ul_config->sfn, ul_config->slot);
+          LOG_D(NR_MAC, "[%d.%d]: number of UL PDUs: %d with UL transmission in [%d.%d]\n", frame_tx, slot_tx, ul_config->number_pdus, ul_config->sfn, ul_config->slot);
           uint8_t ulsch_input_buffer_array[NFAPI_MAX_NUM_UL_PDU][MAX_ULSCH_PAYLOAD_BYTES];
           nr_scheduled_response_t scheduled_response;
           fapi_nr_tx_request_t tx_req;
@@ -1041,7 +1041,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
             if (ulcfg_pdu->pdu_type == FAPI_NR_UL_CONFIG_TYPE_PUSCH) {
               int mac_pdu_exist = 0;
               uint16_t TBS_bytes = ulcfg_pdu->pusch_config_pdu.pusch_data.tb_size;
-              LOG_I(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
+              LOG_D(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               // printf("[%d.%d] harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",frame_tx, slot_tx,ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               if (ra->ra_state == WAIT_RAR && !ra->cfra) {
                 nr_get_msg3_payload(mod_id);
@@ -1085,7 +1085,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
             pthread_mutex_lock(&ul_config->mutex_ul_config);
         }
         else if(ra->ra_state==4 && ul_config->number_pdus > 0 ){
-          LOG_I(NR_MAC, "[%d.%d]: number of UL PDUs: %d with UL transmission in [%d.%d]\n", frame_tx, slot_tx, ul_config->number_pdus, ul_config->sfn, ul_config->slot);
+          LOG_D(NR_MAC, "[%d.%d]: number of UL PDUs: %d with UL transmission in [%d.%d]\n", frame_tx, slot_tx, ul_config->number_pdus, ul_config->sfn, ul_config->slot);
           uint8_t ulsch_input_buffer_array[NFAPI_MAX_NUM_UL_PDU][MAX_ULSCH_PAYLOAD_BYTES];
           nr_scheduled_response_t scheduled_response;
           fapi_nr_tx_request_t tx_req;
@@ -1098,8 +1098,8 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
             if (ulcfg_pdu->pdu_type == FAPI_NR_UL_CONFIG_TYPE_PUSCH) {
               int mac_pdu_exist = 0;
               uint16_t TBS_bytes = ulcfg_pdu->pusch_config_pdu.pusch_data.tb_size;
-              LOG_I(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
-              printf("[%d.%d] harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",frame_tx, slot_tx,ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
+              LOG_D(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
+              // printf("[%d.%d] harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",frame_tx, slot_tx,ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               if (ra->ra_state == WAIT_RAR && !ra->cfra) {
                 nr_get_msg3_payload(mod_id);
                 memcpy(ulsch_input_buffer, mac->CCCH_pdu.payload, TBS_bytes);
@@ -1190,7 +1190,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
     mac->scheduling_info.SR_pending = 1;
     // Regular BSR trigger
     mac->BSR_reporting_active |= NR_BSR_TRIGGER_REGULAR;
-    LOG_I(NR_MAC, "[UE %d][BSR] Regular BSR Triggered Frame %d slot %d SR for PUSCH is pending\n",
+    LOG_D(NR_MAC, "[UE %d][BSR] Regular BSR Triggered Frame %d slot %d SR for PUSCH is pending\n",
           mod_id, frame_tx, slot_tx);
   }
 
@@ -1246,7 +1246,7 @@ bool nr_update_bsr(module_id_t module_idP, frame_t frameP, slot_t slotP, uint8_t
       lcid_bytes_in_buffer[lcid - 1] = rlc_status.bytes_in_buffer;
 
       if (rlc_status.bytes_in_buffer > 0) {
-        LOG_I(NR_MAC,"[UE %d] PDCCH Tick : LCID%d LCGID%d has data to transmit =%d bytes at frame %d slot %d\n",
+        LOG_D(NR_MAC,"[UE %d] PDCCH Tick : LCID%d LCGID%d has data to transmit =%d bytes at frame %d slot %d\n",
               module_idP, lcid,lcgid,rlc_status.bytes_in_buffer,frameP,slotP);
         mac->scheduling_info.lc_sched_info[lcid - 1].LCID_status = LCID_NOT_EMPTY;
 
@@ -1550,7 +1550,7 @@ int nr_ue_pusch_scheduler(NR_UE_MAC_INST_t *mac, uint8_t is_Msg3, frame_t curren
 
   }
 
-  LOG_I(NR_MAC, "[%04d.%02d] UL transmission in [%04d.%02d] (k2 %ld delta %d)\n", current_frame, current_slot, *frame_tx, *slot_tx, k2, delta);
+  LOG_D(NR_MAC, "[%04d.%02d] UL transmission in [%04d.%02d] (k2 %ld delta %d)\n", current_frame, current_slot, *frame_tx, *slot_tx, k2, delta);
   // printf("[%04d.%02d] UL transmission in [%04d.%02d] (k2 %ld delta %d)\n", current_frame, current_slot, *frame_tx, *slot_tx, k2, delta);
 
   return 0;

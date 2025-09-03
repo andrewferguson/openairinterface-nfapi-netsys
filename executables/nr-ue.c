@@ -178,17 +178,17 @@ void init_nrUE_standalone_thread(int ue_idx)
 
   NR_UE_MAC_INST_t *mac = get_mac_inst(0);
   pthread_mutex_init(&mac->mutex_dl_info, NULL);
-
+    pthread_t phy_thread;
+  if (pthread_create(&phy_thread, NULL, NRUE_phy_stub_standalone_pnf_task, NULL) != 0) {
+    LOG_E(NR_MAC, "pthread_create failed for calling NRUE_phy_stub_standalone_pnf_task");
+  }
+  pthread_setname_np(phy_thread, "oai:nrue-stand-phy");
   pthread_t thread;
   if (pthread_create(&thread, NULL, nrue_standalone_pnf_task, NULL) != 0) {
     LOG_E(NR_MAC, "pthread_create failed for calling nrue_standalone_pnf_task");
   }
   pthread_setname_np(thread, "oai:nrue-stand");
-  pthread_t phy_thread;
-  if (pthread_create(&phy_thread, NULL, NRUE_phy_stub_standalone_pnf_task, NULL) != 0) {
-    LOG_E(NR_MAC, "pthread_create failed for calling NRUE_phy_stub_standalone_pnf_task");
-  }
-  pthread_setname_np(phy_thread, "oai:nrue-stand-phy");
+
 }
 
 static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
@@ -229,9 +229,9 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
     int dl_tti_sfn_slot = NFAPI_SFNSLOT2HEX(dl_tti_request->SFN, dl_tti_request->Slot);
        int check_count = 0;
     nfapi_nr_tx_data_request_t *tx_data_request = NULL;
-    while(true) {
+    while(check_count < 5) {
        if(check_count !=0)
-        printf("[%d.%d] Checking tx_Data_request for %d times \n", NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot), check_count);
+        // printf("[%d.%d] Checking tx_Data_request for %d times \n", NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot), check_count);
         tx_data_request = unqueue_matching(&nr_tx_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &dl_tti_sfn_slot);
         if(tx_data_request)
           break;
@@ -362,6 +362,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       mac->dl_info.rx_ind = NULL;
       nr_ue_dl_indication(&mac->dl_info);
     }
+    
 
     if (pthread_mutex_unlock(&mac->mutex_dl_info)) abort();
 
@@ -380,7 +381,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     ul_slot_ind->slot_ind.header.message_id = NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION;
     ul_slot_ind->slot_ind.slot= slot;
     ul_slot_ind->slot_ind.sfn = frame;
-    LOG_I(NR_MAC,"[%d.%d] Sending slot indication to PNF\n",
+    LOG_D(NR_MAC,"[%d.%d] Sending slot indication to PNF\n",
           ul_slot_ind->slot_ind.sfn, ul_slot_ind->slot_ind.slot);
     // printf("[%d.%d] Sending slot indication to PNF\n",
     //       ul_slot_ind->slot_ind.sfn, ul_slot_ind->slot_ind.slot);

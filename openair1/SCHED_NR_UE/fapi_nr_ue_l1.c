@@ -223,7 +223,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                 rx_ind = NULL;
               }
               else{
-                LOG_I(NR_MAC, "[%d.%d] Queued RX_IND Num of rx_ind %d \n", rx_ind->sfn, rx_ind->slot, rx_ind->number_of_pdus);
+                LOG_D(NR_MAC, "[%d.%d] Queued RX_IND Num of rx_ind %d \n", rx_ind->sfn, rx_ind->slot, rx_ind->number_of_pdus);
               }
 
               if (!put_queue(&nr_crc_ind_queue, crc_ind)) {
@@ -246,7 +246,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             break;
           }
           case FAPI_NR_UL_CONFIG_TYPE_PUCCH: {
-            LOG_I(NR_MAC, "[%d.%d] In %s: Processing PUCCH PDU type FAPI_NR_UL_CONFIG_TYPE_PUCCH\n", scheduled_response->frame, scheduled_response->slot,  __FUNCTION__);
+            LOG_D(NR_MAC, "[%d.%d] In %s: Processing PUCCH PDU type FAPI_NR_UL_CONFIG_TYPE_PUCCH\n", scheduled_response->frame, scheduled_response->slot,  __FUNCTION__);
             nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
             uci_ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION;
             uci_ind->sfn = scheduled_response->frame;
@@ -254,16 +254,16 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             uci_ind->num_ucis = 1;
             uci_ind->uci_list = CALLOC(uci_ind->num_ucis, sizeof(*uci_ind->uci_list));
             for (int j = 0; j < uci_ind->num_ucis; j++) {
-              LOG_I(NR_MAC, "[%d.%d]ul_config->ul_config_list[%d].pucch_config_pdu.n_bit = %d\n", scheduled_response->frame, scheduled_response->slot, i, ul_config->ul_config_list[i].pucch_config_pdu.n_bit);
+              LOG_D(NR_MAC, "[%d.%d]ul_config->ul_config_list[%d].pucch_config_pdu.n_bit = %d\n", scheduled_response->frame, scheduled_response->slot, i, ul_config->ul_config_list[i].pucch_config_pdu.n_bit);
               if (ul_config->ul_config_list[i].pucch_config_pdu.n_bit > 3 && mac->nr_ue_emul_l1.num_csi_reports > 0) {
                 uci_ind->uci_list[j].pdu_type = NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE;
                 uci_ind->uci_list[j].pdu_size = sizeof(nfapi_nr_uci_pucch_pdu_format_2_3_4_t);
                 nfapi_nr_uci_pucch_pdu_format_2_3_4_t *pdu_2_3_4 = &uci_ind->uci_list[j].pucch_pdu_format_2_3_4;
-                LOG_I(NR_MAC, "[%d.%d] Filling uci 2_3_4 \n ",uci_ind->sfn , uci_ind->slot  );
+                LOG_D(NR_MAC, "[%d.%d] Filling uci 2_3_4 \n ",uci_ind->sfn , uci_ind->slot  );
                 fill_uci_2_3_4(pdu_2_3_4, &ul_config->ul_config_list[i].pucch_config_pdu);
               }
               else {
-                LOG_I(NR_MAC, "[%d.%d] Filling uci 0_1 \n ",uci_ind->sfn , uci_ind->slot  );
+                LOG_D(NR_MAC, "[%d.%d] Filling uci 0_1 \n ",uci_ind->sfn , uci_ind->slot  );
                 nfapi_nr_uci_pucch_pdu_format_0_1_t *pdu_0_1 = &uci_ind->uci_list[j].pucch_pdu_format_0_1;
                 uci_ind->uci_list[j].pdu_type = NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE;
                 uci_ind->uci_list[j].pdu_size = sizeof(nfapi_nr_uci_pucch_pdu_format_0_1_t);
@@ -274,7 +274,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                 pdu_0_1->ul_cqi = 255;
                 pdu_0_1->timing_advance = 0;
                 pdu_0_1->rssi = 0;
-                LOG_I(NR_MAC, "[%d.%d] Filling pdu_0_1->pduBitmap MAC NUM_HARQ %d\n ",uci_ind->sfn , uci_ind->sfn, mac->nr_ue_emul_l1.num_harqs);  
+                LOG_D(NR_MAC, "[%d.%d] Filling pdu_0_1->pduBitmap MAC NUM_HARQ %d\n ",uci_ind->sfn , uci_ind->sfn, mac->nr_ue_emul_l1.num_harqs);  
                 if (mac->nr_ue_emul_l1.num_harqs > 0) {
 
                   int harq_index = 0;

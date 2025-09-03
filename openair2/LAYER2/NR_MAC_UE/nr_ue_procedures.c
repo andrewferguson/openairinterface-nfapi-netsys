@@ -2285,10 +2285,10 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
                 current_harq->ack_received = false;
               } else {
                 LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed for now marking as compelete \n", dl_harq_pid);
-                ack_data[code_word][dai_current - 1] = current_harq->ack;
-                current_harq->active = false;
-                current_harq->ack_received = false;
-               // ack_data[code_word][dai_current - 1] = 0;
+                // ack_data[code_word][dai_current - 1] = current_harq->ack;
+                // current_harq->active = false;
+                // current_harq->ack_received = false;
+               ack_data[code_word][dai_current - 1] = 0;
               }
               dai[code_word][dai_current - 1] = current_harq->dai + 1;
               int temp_ind = current_harq->pucch_resource_indicator;
@@ -2860,7 +2860,7 @@ void nr_ue_send_sdu(nr_downlink_indication_t *dl_info, int pdu_id)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_IN);
 
-  LOG_I(NR_MAC, "In [%d.%d] Handling DLSCH PDU type %d\n",
+  LOG_D(NR_MAC, "In [%d.%d] Handling DLSCH PDU type %d\n",
         dl_info->frame, dl_info->slot, dl_info->rx_ind->rx_indication_body[pdu_id].pdu_type);
 
   // Processing MAC PDU
@@ -3613,7 +3613,7 @@ void nr_ue_process_mac_pdu(nr_downlink_indication_t *dl_info,
     return;
   }
 
-  LOG_I(NR_MAC, "In %s [%d.%d]: processing PDU %d (with length %d) of %d total number of PDUs...\n", __FUNCTION__, frameP, slot, pdu_id, pdu_len, dl_info->rx_ind->number_pdus);
+  LOG_D(NR_MAC, "In %s [%d.%d]: processing PDU %d (with length %d) of %d total number of PDUs...\n", __FUNCTION__, frameP, slot, pdu_id, pdu_len, dl_info->rx_ind->number_pdus);
 
   while (!done && pdu_len > 0){
     uint16_t mac_len = 0x0000;
