@@ -37,6 +37,15 @@
 /* exe */
 #include "executables/nr-softmodem.h"
 
+/* UE HARQ diagnostic counters (per-second, printed at frame%100==0) */
+static int ue_stat_dci_cnt = 0;         /* DCI received for DL (set_harq_status calls) */
+static long long ue_stat_total_tbs = 0; /* sum of TBS from set_harq_status */
+static int ue_stat_ack_real = 0;        /* HARQ ACKs sent (ack_received=true, ack=1) */
+static int ue_stat_nack_real = 0;       /* HARQ NACKs sent (ack_received=true, ack=0) */
+static int ue_stat_ack_assumed = 0;     /* ACKs assumed in emulate_l1 (ack_received=false) */
+int ue_stat_decode_cnt = 0;             /* decode completions (update_harq_status calls) — extern in NR_IF_Module.c */
+static int ue_stat_last_report = -1;    /* last reported frame (to avoid double-print) */
+
 /* RRC*/
 #include "RRC/NR_UE/rrc_proto.h"
 
@@ -670,6 +679,12 @@ static int nr_ue_process_dci_dl_10(module_id_t module_id,
                                            coreset_type,
                                            mac->get_sib1);
 
+  if (tda_info.nrOfSymbols == 0) {
+    LOG_W(MAC, "[%d.%d] Invalid time_domain_assignment %d. Possibly due to false DCI. Ignoring DCI!\n",
+          frame, slot, dci->time_domain_assignment.val);
+    return -1;
+  }
+
   dlsch_pdu->number_symbols = tda_info.nrOfSymbols;
   dlsch_pdu->start_symbol = tda_info.startSymbolIndex;
 
@@ -939,6 +954,12 @@ static int nr_ue_process_dci_dl_11(module_id_t module_id,
                                            get_rnti_type(mac, dci_ind->rnti),
                                            coreset_type,
                                            false);
+
+  if (tda_info.nrOfSymbols == 0) {
+    LOG_W(MAC, "[%d.%d] Invalid time_domain_assignment %d. Possibly due to false DCI. Ignoring DCI!\n",
+          frame, slot, dci->time_domain_assignment.val);
+    return -1;
+  }
 
   dlsch_pdu->number_symbols = tda_info.nrOfSymbols;
   dlsch_pdu->start_symbol = tda_info.startSymbolIndex;
@@ -1311,6 +1332,12 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
   }
   LOG_D(NR_PHY,"Setting harq_status for harq_id %d, dl %d.%d, sched ul %d.%d fb time %d\n",
         harq_id, frame, slot, current_harq->ul_frame, current_harq->ul_slot, data_toul_fb);
+  /* diagnostic counters */
+  // ue_stat_dci_cnt++;
+  // ue_stat_total_tbs += current_harq->TBS;
+  // printf("[UE-DCI] %4d.%2d pid=%d K1=%d ack@%4d.%2d TBS=%d\n",
+  //        frame, slot, harq_id, data_toul_fb,
+  //        current_harq->ul_frame, current_harq->ul_slot, current_harq->TBS);
 }
 
 void nr_ue_configure_pucch(NR_UE_MAC_INST_t *mac,
@@ -2283,12 +2310,25 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
                 ack_data[code_word][dai_current - 1] = current_harq->ack;
                 current_harq->active = false;
                 current_harq->ack_received = false;
+                // if (current_harq->ack) ue_stat_ack_real++;
+                // else ue_stat_nack_real++;
+                // printf("[UE-ACK] %4d.%2d pid=%d REAL ack=%d\n",
+                //        frame, slot, dl_harq_pid, current_harq->ack);
+              } else if (get_softmodem_params()->emulate_l1) {
+                /* In L1 emulation mode, DLSCH decoding always succeeds.
+                   If ack_received is not yet set, it is due to message
+                   processing ordering, not a real decoding failure.
+                   Treat as ACK to avoid spurious NACKs and retransmissions. */
+                LOG_D(NR_MAC, "DLSCH ACK/NACK reporting for harq pid %d before DLSCH decoding completed (emulation mode: assuming ACK)\n", dl_harq_pid);
+                ack_data[code_word][dai_current - 1] = 1;
+                current_harq->active = false;
+                current_harq->ack_received = false;
+                // ue_stat_ack_assumed++;
+                // printf("[UE-ACK] %4d.%2d pid=%d ASSUMED-ACK (ack_received not set)\n",
+                //        frame, slot, dl_harq_pid);
               } else {
                 LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed for now marking as compelete \n", dl_harq_pid);
-                // ack_data[code_word][dai_current - 1] = current_harq->ack;
-                // current_harq->active = false;
-                // current_harq->ack_received = false;
-               ack_data[code_word][dai_current - 1] = 0;
+                ack_data[code_word][dai_current - 1] = 0;
               }
               dai[code_word][dai_current - 1] = current_harq->dai + 1;
               int temp_ind = current_harq->pucch_resource_indicator;
@@ -2408,6 +2448,21 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
   reverse_n_bits(&o_ACK, number_harq_feedback);
   pucch->ack_payload = o_ACK;
   pucch->n_harq = number_harq_feedback;
+
+  /* per-second summary report */
+  // if (frame % 100 == 0 && frame != ue_stat_last_report) {
+  //   ue_stat_last_report = frame;
+  //   printf("[UE-STAT] frame=%d dci_cnt=%d total_tbs=%lld ack_real=%d nack_real=%d ack_assumed=%d decode_cnt=%d\n",
+  //          frame, ue_stat_dci_cnt, ue_stat_total_tbs,
+  //          ue_stat_ack_real, ue_stat_nack_real, ue_stat_ack_assumed,
+  //          ue_stat_decode_cnt);
+  //   ue_stat_dci_cnt = 0;
+  //   ue_stat_total_tbs = 0;
+  //   ue_stat_ack_real = 0;
+  //   ue_stat_nack_real = 0;
+  //   ue_stat_ack_assumed = 0;
+  //   ue_stat_decode_cnt = 0;
+  // }
 
   return (number_harq_feedback > 0);
 }

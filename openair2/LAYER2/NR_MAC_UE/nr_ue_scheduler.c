@@ -2678,7 +2678,7 @@ typedef struct {
   NR_BSR_SHORT *bsr_t;
   //NR_POWER_HEADROOM_CMD *phr_pr;
   int tot_mac_ce_len;
-  uint8_t total_mac_pdu_header_len;
+  uint16_t total_mac_pdu_header_len;
 } NR_UE_MAC_CE_INFO;
 
 /*

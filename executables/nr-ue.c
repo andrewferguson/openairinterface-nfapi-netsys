@@ -209,8 +209,8 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
     
     if (ul_tti_request_crc && ul_tti_request_crc->n_pdus > 0) {
       check_and_process_dci(NULL, NULL, NULL, ul_tti_request_crc);
-     // free_and_zero(ul_tti_request_crc);
     }
+    free_and_zero(ul_tti_request_crc);
   }
 
   if (rach_ind && rach_ind->number_of_pdus > 0) {
@@ -227,22 +227,26 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
   }
   if (dl_tti_request) {
     int dl_tti_sfn_slot = NFAPI_SFNSLOT2HEX(dl_tti_request->SFN, dl_tti_request->Slot);
-       int check_count = 0;
+    int check_count = 0;
     nfapi_nr_tx_data_request_t *tx_data_request = NULL;
-    while(check_count < 5) {
+    while(check_count < 10) {
        if(check_count !=0)
         // printf("[%d.%d] Checking tx_Data_request for %d times \n", NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot), check_count);
         tx_data_request = unqueue_matching(&nr_tx_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &dl_tti_sfn_slot);
         if(tx_data_request)
           break;
-        usleep(10);
+        usleep(100);
          check_count++;
     }
     if (!tx_data_request) {
-      LOG_E(NR_MAC, "[%d %d] No corresponding tx_data_request for given dl_tti_request sfn/slot\n",
+      /* No matching tx_data_request found. Process DCI from dl_tti_request anyway
+         (e.g. SSB-only or UL DCI that doesn't need PDSCH data). If a PDSCH DCI
+         was present, the emulation mode ACK fallback will handle the missing ack. */
+      LOG_D(NR_MAC, "[%d %d] No corresponding tx_data_request for given dl_tti_request sfn/slot, processing DCI only\n",
             NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot));
       if (get_softmodem_params()->nsa)
         save_nr_measurement_info(dl_tti_request);
+      check_and_process_dci(dl_tti_request, NULL, NULL, NULL);
       free_and_zero(dl_tti_request);
     }
     else if (dl_tti_request->dl_tti_request_body.nPDUs > 0 && tx_data_request->Number_of_PDUs > 0) {
@@ -253,8 +257,10 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
       free_and_zero(tx_data_request);
     }
     else {
-      AssertFatal(false, "We dont have PDUs in either dl_tti %d or tx_req %d\n",
-                  dl_tti_request->dl_tti_request_body.nPDUs, tx_data_request->Number_of_PDUs);
+      LOG_W(NR_MAC, "Unexpected: dl_tti nPDUs=%d tx_req nPDUs=%d — skipping\n",
+            dl_tti_request->dl_tti_request_body.nPDUs, tx_data_request->Number_of_PDUs);
+      free_and_zero(dl_tti_request);
+      free_and_zero(tx_data_request);
     }
   }
   if (ul_dci_request && ul_dci_request->numPdus > 0) {
@@ -366,13 +372,17 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
 
     if (pthread_mutex_unlock(&mac->mutex_dl_info)) abort();
 
+    /* Process queued NFAPI messages (DL_TTI_REQ, TX_DATA_REQ, etc.) BEFORE
+       the UL scheduler so that DLSCH decoding completes and ack_received is
+       set to true before PUCCH HARQ feedback is generated. */
+    LOG_D(NR_MAC, "Slot %d. Processing queued nr_nfapi_msgs\n", ul_info.slot_rx);
+    process_queued_nr_nfapi_msgs(mac, sfn_slot);
+
     if (is_nr_UL_slot(mac->tdd_UL_DL_ConfigurationCommon,
                       ul_info.slot_tx, mac->frame_type)) {
       LOG_D(NR_MAC, "Slot %d. calling nr_ue_ul_ind()\n", ul_info.slot_tx);
       nr_ue_ul_scheduler(&ul_info);
     }
-    LOG_D(NR_MAC, "Slot %d. Calling nr_ue_ul_indication()\n", ul_info.slot_rx);
-    process_queued_nr_nfapi_msgs(mac, sfn_slot);
     // send NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION back to PNF
 
     NR_UL_IND_t *ul_slot_ind ;

@@ -3057,6 +3057,10 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 		return -1;
 	}
 
+	int p7_bufsize = 50 * 1024 * 1024;
+	setsockopt(pnf_p7->p7_sock, SOL_SOCKET, SO_RCVBUF, &p7_bufsize, sizeof(p7_bufsize));
+	setsockopt(pnf_p7->p7_sock, SOL_SOCKET, SO_SNDBUF, &p7_bufsize, sizeof(p7_bufsize));
+
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -3228,6 +3232,10 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "PNF P7 setsockopt (IPPROTO_IP, IP_TOS) failed errno: %d\n", errno);
 		return -1;
 	}
+
+	int p7_bufsize = 50 * 1024 * 1024;
+	setsockopt(pnf_p7->p7_sock, SOL_SOCKET, SO_RCVBUF, &p7_bufsize, sizeof(p7_bufsize));
+	setsockopt(pnf_p7->p7_sock, SOL_SOCKET, SO_SNDBUF, &p7_bufsize, sizeof(p7_bufsize));
 
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
