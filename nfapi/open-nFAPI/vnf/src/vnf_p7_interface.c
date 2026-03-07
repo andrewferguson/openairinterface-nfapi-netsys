@@ -129,6 +129,10 @@ int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 		return -1;
 	}
 
+	int bufsize = 50 * 1024 * 1024;
+	setsockopt(vnf_p7->socket, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize));
+	setsockopt(vnf_p7->socket, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize));
+
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 setsockopt succeeded...\n");
 
 	// Create the address structure
@@ -274,6 +278,10 @@ int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "After setsockopt (IP_TOS) errno: %d\n", errno);
 		return -1;
 	}
+
+	int bufsize = 50 * 1024 * 1024;
+	setsockopt(vnf_p7->socket, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize));
+	setsockopt(vnf_p7->socket, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize));
 
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 setsockopt succeeded...\n");
 

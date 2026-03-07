@@ -46,6 +46,7 @@
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
 
 #include <executables/softmodem-common.h>
+#include <stdio.h>
 extern RAN_CONTEXT_t RC;
 extern const uint8_t nr_slots_per_frame[5];
 extern uint16_t sl_ahead;
@@ -68,6 +69,31 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
 static const uint8_t DELTA[4] = {2, 3, 4, 6};
 
 static const float ssb_per_rach_occasion[8] = {0.125, 0.25, 0.5, 1, 2, 4, 8};
+static const int MSG4_ACK_TIMEOUT_MS = 100;
+static const int MSG4_ACK_TIMEOUT_RETRIES_EMUL = 1;
+
+static bool nr_list_contains(const NR_list_t *listP, int id)
+{
+  for (int cur = listP->head; cur >= 0; cur = listP->next[cur])
+    if (cur == id)
+      return true;
+  return false;
+}
+
+static void recycle_dl_harq_pid(NR_UE_sched_ctrl_t *sched_ctrl, int harq_pid)
+{
+  NR_UE_harq_t *harq = &sched_ctrl->harq_processes[harq_pid];
+  if (nr_list_contains(&sched_ctrl->feedback_dl_harq, harq_pid))
+    remove_nr_list(&sched_ctrl->feedback_dl_harq, harq_pid);
+  if (nr_list_contains(&sched_ctrl->retrans_dl_harq, harq_pid))
+    remove_nr_list(&sched_ctrl->retrans_dl_harq, harq_pid);
+  if (!nr_list_contains(&sched_ctrl->available_dl_harq, harq_pid))
+    add_tail_nr_list(&sched_ctrl->available_dl_harq, harq_pid);
+  harq->is_waiting = false;
+  harq->round = 0;
+  harq->feedback_slot = -1;
+  harq->feedback_frame = -1;
+}
 
 static int16_t ssb_index_from_prach(module_id_t module_idP,
                                     frame_t frameP,
@@ -1863,6 +1889,7 @@ static void nr_generate_Msg4(module_id_t module_idP,
     }
 
     ra->state = WAIT_Msg4_ACK;
+    ra->RRC_timer = MSG4_ACK_TIMEOUT_MS << UE->current_UL_BWP.scs;
     LOG_I(NR_MAC,"UE %04x Generate msg4: feedback at %4d.%2d, payload %d bytes, next state WAIT_Msg4_ACK\n", ra->rnti, pucch->frame, pucch->ul_slot, harq->tb_size);
   }
 }
@@ -1875,28 +1902,78 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
     return;
   }
   const int current_harq_pid = ra->harq_pid;
+  const bool emul_l1 = get_softmodem_params()->emulate_l1;
 
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   NR_UE_harq_t *harq = &sched_ctrl->harq_processes[current_harq_pid];
 
   LOG_I(NR_MAC, "ue rnti 0x%04x, harq is waiting %d, round %d, frame %d %d, harq id %d\n", ra->rnti, harq->is_waiting, harq->round, frame, slot, current_harq_pid);
 
+  if (harq->is_waiting) {
+    if (ra->RRC_timer > 0)
+      ra->RRC_timer--;
+    if (ra->RRC_timer == 0) {
+      const rnti_t failed_rnti = ra->rnti;
+      if (emul_l1 && ra->msg4_ack_timeout_count < MSG4_ACK_TIMEOUT_RETRIES_EMUL) {
+        ra->msg4_ack_timeout_count++;
+        printf("[RA-RECOVERY] %4d.%2d UE %04x: Msg4 ACK timeout pid=%d, retry %d/%d\n",
+               frame,
+               slot,
+               failed_rnti,
+               current_harq_pid,
+               ra->msg4_ack_timeout_count,
+               MSG4_ACK_TIMEOUT_RETRIES_EMUL);
+        fflush(stdout);
+        recycle_dl_harq_pid(sched_ctrl, current_harq_pid);
+        ra->state = Msg4;
+        return;
+      }
+      printf("[RA-RECOVERY] %4d.%2d UE %04x: Msg4 ACK timeout pid=%d, clearing stale UE context for fresh RACH\n",
+             frame,
+             slot,
+             failed_rnti,
+             current_harq_pid);
+      fflush(stdout);
+      recycle_dl_harq_pid(sched_ctrl, current_harq_pid);
+      nr_clear_ra_proc(module_id, CC_id, frame, ra);
+      mac_remove_nr_ue(RC.nrmac[module_id], failed_rnti);
+    }
+    return;
+  }
+
   if (harq->is_waiting == 0) {
     if (harq->round == 0) {
       if (UE->Msg4_ACKed) {
         LOG_A(NR_MAC, "(UE RNTI 0x%04x) Received Ack of RA-Msg4. CBRA procedure succeeded!\n", ra->rnti);
         UE->ra_timer = 0;
+        // Pause scheduling according to:
+        // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
+        nr_mac_enable_ue_rrc_processing_timer(RC.nrmac[module_id], UE, false);
+        nr_clear_ra_proc(module_id, CC_id, frame, ra);
+        if (sched_ctrl->retrans_dl_harq.head >= 0) {
+          remove_nr_list(&sched_ctrl->retrans_dl_harq, current_harq_pid);
+        }
+      } else if (emul_l1 && ra->msg4_ack_timeout_count < MSG4_ACK_TIMEOUT_RETRIES_EMUL) {
+        ra->msg4_ack_timeout_count++;
+        printf("[RA-RECOVERY] %4d.%2d UE %04x: Msg4 HARQ done without ACK flag, retry %d/%d\n",
+               frame,
+               slot,
+               ra->rnti,
+               ra->msg4_ack_timeout_count,
+               MSG4_ACK_TIMEOUT_RETRIES_EMUL);
+        fflush(stdout);
+        recycle_dl_harq_pid(sched_ctrl, current_harq_pid);
+        ra->state = Msg4;
       } else {
-        LOG_I(NR_MAC, "%4d.%2d UE %04x: RA Procedure failed at Msg4!\n", frame, slot, ra->rnti);
-      }
-
-      // Pause scheduling according to:
-      // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
-      nr_mac_enable_ue_rrc_processing_timer(RC.nrmac[module_id], UE, false);
-
-      nr_clear_ra_proc(module_id, CC_id, frame, ra);
-      if (sched_ctrl->retrans_dl_harq.head >= 0) {
-        remove_nr_list(&sched_ctrl->retrans_dl_harq, current_harq_pid);
+        const rnti_t failed_rnti = ra->rnti;
+        printf("[RA-RECOVERY] %4d.%2d UE %04x: Msg4 failed, clearing stale UE context for fresh RACH\n",
+               frame,
+               slot,
+               failed_rnti);
+        fflush(stdout);
+        recycle_dl_harq_pid(sched_ctrl, current_harq_pid);
+        nr_clear_ra_proc(module_id, CC_id, frame, ra);
+        mac_remove_nr_ue(RC.nrmac[module_id], failed_rnti);
       }
     } else {
       LOG_I(NR_MAC, "(UE %04x) Received Nack of RA-Msg4. Preparing retransmission!\n", ra->rnti);
@@ -1914,6 +1991,7 @@ void nr_clear_ra_proc(module_id_t module_idP, int CC_id, frame_t frameP, NR_RA_t
   ra->timing_offset = 0;
   ra->RRC_timer = 20;
   ra->msg3_round = 0;
+  ra->msg4_ack_timeout_count = 0;
   if(ra->cfra == false) {
     ra->rnti = 0;
   }

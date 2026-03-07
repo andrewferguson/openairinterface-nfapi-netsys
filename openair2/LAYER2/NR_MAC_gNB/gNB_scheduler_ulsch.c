@@ -186,7 +186,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
            we gracefully ignore that by returning 0. See:
            https://gitlab.eurecom.fr/oai/openairinterface5g/-/issues/534 */
         if (!get_mac_len(pduP, pdu_len, &mac_len, &mac_subheader_len)) {
-          LOG_E(NR_MAC, "pdu_len %d is invalid (shorter than MAC PDU header)\n", pdu_len);
+          LOG_E(NR_MAC, "pdu_len %d is invalid for Long BSR MAC CE parsing\n", pdu_len);
           return 0;
         }
         /* Extract long BSR value */
@@ -307,7 +307,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
       case UL_SCH_LCID_SRB1:
       case UL_SCH_LCID_SRB2:
         if (!get_mac_len(pduP, pdu_len, &mac_len, &mac_subheader_len)) {
-          LOG_E(NR_MAC, "pdu_len %d is invalid (shorter than MAC PDU header)\n", pdu_len);
+          LOG_E(NR_MAC, "pdu_len %d is invalid for SRB%d MAC SDU parsing\n", pdu_len, rx_lcid);
           return 0;
         }
 
@@ -396,7 +396,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
       case UL_SCH_LCID_DTCH ... (UL_SCH_LCID_DTCH + 28):
         //  check if LCID is valid at current time.
         if (!get_mac_len(pduP, pdu_len, &mac_len, &mac_subheader_len)) {
-          LOG_E(NR_MAC, "pdu_len %d is invalid (shorter than MAC PDU header)\n", pdu_len);
+          LOG_E(NR_MAC, "pdu_len %d is invalid for LCID %d MAC SDU parsing\n", pdu_len, rx_lcid);
           return 0;
         }
 
@@ -1372,7 +1372,7 @@ long get_K2(NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList,
 
 static bool nr_UE_is_to_be_scheduled(const NR_ServingCellConfigCommon_t *scc, int CC_id,  NR_UE_info_t* UE, frame_t frame, sub_frame_t slot, uint32_t ulsch_max_frame_inactivity)
 { 
-  const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+  const int n = nr_slots_per_frame[UE->current_UL_BWP.scs];
   const int now = frame * n + slot;
 
   const NR_UE_sched_ctrl_t *sched_ctrl =&UE->UE_sched_ctrl;
@@ -1636,6 +1636,23 @@ static void pf_ul(module_id_t module_id,
                   int n_rb_sched,
                   uint16_t *rballoc_mask)
 {
+  static const bool gnb_ul_sched_diag_enabled = false;
+  /* UL scheduler diagnostics */
+  static int ul_sched_calls = 0;
+  static int ul_grants_data = 0;
+  static int ul_grants_inactivity = 0;
+  static int ul_skip_no_harq = 0;
+  static int ul_skip_no_data_no_sched = 0;
+  static int ul_skip_rrc_timer = 0;
+  static int ul_skip_msg4 = 0;
+  static int ul_total_rb = 0;
+  static int ul_total_tbs = 0;
+  static int ul_est_buf_max = 0;
+  static int ul_sched_bytes_max = 0;
+  static int ul_last_frame = -1;
+
+  if (gnb_ul_sched_diag_enabled)
+    ul_sched_calls++;
 
   const int CC_id = 0;
   gNB_MAC_INST *nrmac = RC.nrmac[module_id];
@@ -1651,8 +1668,11 @@ static void pf_ul(module_id_t module_id,
   UE_iterator(UE_list, UE) {
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-    if (UE->Msg4_ACKed != true || sched_ctrl->ul_failure)
+    if (UE->Msg4_ACKed != true || sched_ctrl->ul_failure) {
+      if (gnb_ul_sched_diag_enabled)
+        ul_skip_msg4++;
       continue;
+    }
 
     LOG_D(NR_MAC,"pf_ul: preparing UL scheduling for UE %04x\n",UE->rnti);
     NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
@@ -1700,6 +1720,8 @@ static void pf_ul(module_id_t module_id,
             UE->rnti,
             frame,
             slot);
+      if (gnb_ul_sched_diag_enabled)
+        ul_skip_no_harq++;
       continue;
     }
 
@@ -1707,8 +1729,21 @@ static void pf_ul(module_id_t module_id,
     /* preprocessor computed sched_frame/sched_slot */
     const bool do_sched = nr_UE_is_to_be_scheduled(scc, 0, UE, sched_pusch->frame, sched_pusch->slot, nrmac->ulsch_max_frame_inactivity);
 
+    if (gnb_ul_sched_diag_enabled) {
+      if (sched_ctrl->estimated_ul_buffer > ul_est_buf_max)
+        ul_est_buf_max = sched_ctrl->estimated_ul_buffer;
+      if (sched_ctrl->sched_ul_bytes > ul_sched_bytes_max)
+        ul_sched_bytes_max = sched_ctrl->sched_ul_bytes;
+    }
+
     LOG_D(NR_MAC,"pf_ul: do_sched UE %04x => %s\n",UE->rnti,do_sched ? "yes" : "no");
     if ((B == 0 && !do_sched) || (sched_ctrl->rrc_processing_timer > 0)) {
+      if (gnb_ul_sched_diag_enabled) {
+        if (sched_ctrl->rrc_processing_timer > 0)
+          ul_skip_rrc_timer++;
+        else
+          ul_skip_no_data_no_sched++;
+      }
       continue;
     }
 
@@ -1723,6 +1758,8 @@ static void pf_ul(module_id_t module_id,
     /* Schedule UE on SR or UL inactivity and no data (otherwise, will be scheduled
      * based on data to transmit) */
     if (B == 0 && do_sched) {
+      if (gnb_ul_sched_diag_enabled)
+        ul_grants_inactivity++;
       /* if no data, pre-allocate 5RB */
       /* Find a free CCE */
       int CCEIndex = get_cce_index(nrmac,
@@ -1919,7 +1956,34 @@ static void pf_ul(module_id_t module_id,
 
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
     remainUEs--;
+    if (gnb_ul_sched_diag_enabled) {
+      ul_grants_data++;
+      ul_total_rb += sched_pusch->rbSize;
+      ul_total_tbs += sched_pusch->tb_size;
+    }
     iterator++;
+  }
+
+  /* Periodic UL scheduler diagnostic - every 100 frames (~1 sec) */
+  if (gnb_ul_sched_diag_enabled && frame % 100 == 0 && slot == 0 && ul_last_frame != frame) {
+    ul_last_frame = frame;
+    printf("[UL-SCHED] frame=%d calls=%d grants_data=%d grants_inact=%d "
+           "skip_msg4=%d skip_noharq=%d skip_nodata=%d skip_rrc=%d "
+           "total_rb=%d total_tbs=%d est_buf_max=%d sched_bytes_max=%d n_rb_sched=%d\n",
+           frame, ul_sched_calls, ul_grants_data, ul_grants_inactivity,
+           ul_skip_msg4, ul_skip_no_harq, ul_skip_no_data_no_sched, ul_skip_rrc_timer,
+           ul_total_rb, ul_total_tbs, ul_est_buf_max, ul_sched_bytes_max, n_rb_sched);
+    ul_sched_calls = 0;
+    ul_grants_data = 0;
+    ul_grants_inactivity = 0;
+    ul_skip_msg4 = 0;
+    ul_skip_no_harq = 0;
+    ul_skip_no_data_no_sched = 0;
+    ul_skip_rrc_timer = 0;
+    ul_total_rb = 0;
+    ul_total_tbs = 0;
+    ul_est_buf_max = 0;
+    ul_sched_bytes_max = 0;
   }
 }
 

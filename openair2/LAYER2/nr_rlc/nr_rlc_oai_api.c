@@ -216,6 +216,7 @@ mac_rlc_status_resp_t mac_rlc_status_ind(const module_id_t module_idP,
 
   if (rb != NULL) {
     nr_rlc_entity_buffer_status_t buf_stat;
+    static const bool rlc_status_diag_enabled = false;
     rb->set_time(rb, nr_rlc_current_time);
     /* 38.321 deals with BSR values up to 81338368 bytes, after what it
      * reports '> 81338368' (table 6.1.3.1-2). Passing 100000000 is thus
@@ -226,9 +227,29 @@ mac_rlc_status_resp_t mac_rlc_status_ind(const module_id_t module_idP,
     ret.bytes_in_buffer = buf_stat.status_size
                         + buf_stat.retx_size
                         + buf_stat.tx_size;
+    if (rlc_status_diag_enabled) {
+      // Diagnostic: track DTCH buffer status
+      static int rlc_status_calls = 0;
+      static int rlc_status_nonzero = 0;
+      static int rlc_last_report = -1;
+      rlc_status_calls++;
+      if (ret.bytes_in_buffer > 0)
+        rlc_status_nonzero++;
+      if (channel_idP >= 4 && frameP % 100 == 0 && subframeP == 0 && frameP != rlc_last_report) {
+        int avail_space = rb->available_tx_space(rb);
+        printf("[RLC-STAT] frame=%d lcid=%d bstatus_tx=%d retx=%d status=%d | avail_tx_space=%d (tx_maxsize-tx_size) | calls=%d nonzero=%d\n",
+              frameP, channel_idP, buf_stat.tx_size, buf_stat.retx_size, buf_stat.status_size,
+              avail_space, rlc_status_calls, rlc_status_nonzero);
+        rlc_status_calls = 0;
+        rlc_status_nonzero = 0;
+        rlc_last_report = frameP;
+      }
+    }
   } else {
+    static int rlc_status_null_rb_count = 0;
+    rlc_status_null_rb_count++;
     if (!(frameP%128) || channel_idP == 0) //to suppress this warning message
-      LOG_W(RLC, "[%s] Radio Bearer (channel ID %d) is NULL for UE with rntiP %x\n", __FUNCTION__, channel_idP, rntiP);
+      LOG_W(RLC, "[%s] Radio Bearer (channel ID %d) is NULL for UE with rntiP %x (null_count=%d)\n", __FUNCTION__, channel_idP, rntiP, rlc_status_null_rb_count);
     ret.bytes_in_buffer = 0;
   }
 
@@ -605,9 +626,10 @@ static void max_retx_reached(void *_ue, nr_rlc_entity_t *entity)
   exit(1);
 
 rb_found:
-  LOG_E(RLC, "max RETX reached on %s %d\n",
+  LOG_E(RLC, "max RETX reached on %s %d (rnti %04x)\n",
         is_srb ? "SRB" : "DRB",
-        rb_id);
+        rb_id,
+        ue->rnti);
 
   /* TODO: do something for DRBs? */
   if (is_srb == 0)

@@ -94,8 +94,10 @@
 #define MAX_NUM_BWP 5
 #define MAX_NUM_CORESET 12
 #define MAX_NUM_CCE 90
-/*!\brief Maximum number of random access process */
-#define NR_NB_RA_PROC_MAX 4
+/*!\brief Maximum number of concurrent random access processes.
+ * 4 is too small for multi-UE bring-up bursts and can stall new attaches when
+ * a few RA contexts wait on Msg4 ACK. Keep this aligned with expected UE load. */
+#define NR_NB_RA_PROC_MAX 16
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
@@ -204,6 +206,8 @@ typedef struct {
   uint8_t msg3_cqireq;
   /// Round of Msg3 HARQ
   uint8_t msg3_round;
+  /// Number of Msg4 ACK timeout-based retries done for this RA process
+  uint8_t msg4_ack_timeout_count;
   int msg3_startsymb;
   int msg3_nrsymb;
   /// TBS used for Msg4

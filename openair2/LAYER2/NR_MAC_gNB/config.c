@@ -454,11 +454,17 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
               "SSB Bitmap type %d is not valid\n",
               scc->ssb_PositionsInBurst->present);
 
-  int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-  if (*scc->ssbSubcarrierSpacing == 0)
-    n <<= 1; // to have enough room for feedback possibly beyond the frame we need a larger array at 15kHz SCS
-  nrmac->common_channels[0].vrb_map_UL = calloc(n * MAX_BWP_SIZE, sizeof(uint16_t));
-  nrmac->vrb_map_UL_size = n;
+  const NR_SubcarrierSpacing_t sched_scs =
+      scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+  if (*scc->ssbSubcarrierSpacing != sched_scs)
+    LOG_W(NR_MAC,
+          "SSB SCS (%ld) differs from carrier SCS (%ld). Using carrier SCS for MAC slot-buffer sizing.\n",
+          *scc->ssbSubcarrierSpacing,
+          sched_scs);
+  const int slots_per_frame = nr_slots_per_frame[sched_scs];
+  const int vrb_slots = slots_per_frame << 1; // keep room for grants that spill to next frame
+  nrmac->common_channels[0].vrb_map_UL = calloc(vrb_slots * MAX_BWP_SIZE, sizeof(uint16_t));
+  nrmac->vrb_map_UL_size = vrb_slots;
   AssertFatal(nrmac->common_channels[0].vrb_map_UL,
               "could not allocate memory for RC.nrmac[]->common_channels[0].vrb_map_UL\n");
 
@@ -481,19 +487,26 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
 
   const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
 
-  int nr_slots_period = n;
-  int nr_dl_slots = n;
+  int nr_slots_period = slots_per_frame;
+  int nr_dl_slots = slots_per_frame;
   int nr_ulstart_slot = 0;
   if (tdd) {
     nr_dl_slots = tdd->nrofDownlinkSlots + (tdd->nrofDownlinkSymbols != 0);
     nr_ulstart_slot = get_first_ul_slot(tdd->nrofDownlinkSlots, tdd->nrofDownlinkSymbols, tdd->nrofUplinkSymbols);
-    nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
+    nr_slots_period = slots_per_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
   } else {
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration
     AssertFatal(nrmac->common_channels[0].frame_type == FDD,"Dynamic TDD not handled yet\n");
   }
 
-  for (int slot = 0; slot < n; ++slot) {
+  /* Build per-frame DL/UL slot bitmaps using real frame slots (not doubled VRB storage). */
+  nrmac->dlsch_slot_bitmap[0] = 0;
+  nrmac->dlsch_slot_bitmap[1] = 0;
+  nrmac->dlsch_slot_bitmap[2] = 0;
+  nrmac->ulsch_slot_bitmap[0] = 0;
+  nrmac->ulsch_slot_bitmap[1] = 0;
+  nrmac->ulsch_slot_bitmap[2] = 0;
+  for (int slot = 0; slot < slots_per_frame; ++slot) {
     nrmac->dlsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) < nr_dl_slots) << (slot % 64);
     nrmac->ulsch_slot_bitmap[slot / 64] |= (uint64_t)((slot % nr_slots_period) >= nr_ulstart_slot) << (slot % 64);
 

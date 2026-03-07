@@ -591,6 +591,16 @@ static int comparator(const void *p, const void *q) {
   return ((UEsched_t*)p)->coef < ((UEsched_t*)q)->coef;
 }
 
+static int pf_dl_pucch_fail = 0;
+static int pf_dl_cce_fail = 0;
+static int pf_dl_actual_tx = 0;
+static int pf_dl_retx = 0;
+static long long pf_dl_total_tbs = 0;
+static int pf_dl_max_rbsize = 0;
+static const bool gnb_pf_diag_enabled = false;
+extern int g_pucch_fail_dai;
+extern int g_pucch_fail_vrb;
+
 static void pf_dl(module_id_t module_id,
                   frame_t frame,
                   sub_frame_t slot,
@@ -616,7 +626,7 @@ static void pf_dl(module_id_t module_id,
     NR_UE_DL_BWP_t *current_BWP = &UE->current_DL_BWP;
 
     if (sched_ctrl->ul_failure){
-      printf("[%d.%d] Skipping UE cause UL failure \n", frame, slot);
+      LOG_D(NR_MAC, "[%4d.%2d] Skipping UE %04x due to UL failure\n", frame, slot, UE->rnti);
       continue;
     }
     const NR_mac_dir_stats_t *stats = &UE->mac_stats.dl;
@@ -629,7 +639,7 @@ static void pf_dl(module_id_t module_id,
     UE->dl_thr_ue = (1 - a) * UE->dl_thr_ue + a * b;
 
     if (remainUEs == 0){
-      printf("[%d.%d] No remaining UEs to schedule\n", frame, slot);
+      LOG_D(NR_MAC, "[%4d.%2d] No remaining UEs to schedule\n", frame, slot);
       continue;
     }
 
@@ -649,6 +659,8 @@ static void pf_dl(module_id_t module_id,
 
       /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
       remainUEs--;
+      if (gnb_pf_diag_enabled)
+        pf_dl_retx++;
 
     } else {
       /* skip this UE if there are no free HARQ processes. This can happen e.g.
@@ -674,10 +686,15 @@ static void pf_dl(module_id_t module_id,
       const NR_bler_options_t *bo = &mac->dl_bler;
       const int max_mcs_table = current_BWP->mcsTableIdx == 1 ? 27 : 28;
       const int max_mcs = min(sched_ctrl->dl_max_mcs, max_mcs_table);
-      if (bo->harq_round_max == 1)
+      if (get_softmodem_params()->emulate_l1) {
+        /* In L1 emulation, enforce peak MCS directly to avoid BLER-loop
+         * clamping caused by non-RF feedback/timing artifacts. */
         sched_pdsch->mcs = max_mcs;
-      else
+      } else if (bo->harq_round_max == 1) {
+        sched_pdsch->mcs = max_mcs;
+      } else {
         sched_pdsch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->dl_bler_stats, max_mcs, frame);
+      }
       sched_pdsch->nrOfLayers = get_dl_nrOfLayers(sched_ctrl, current_BWP->dci_format);
       sched_pdsch->pm_index =
           mac->identity_pm ? 0 : get_pm_index(UE, sched_pdsch->nrOfLayers, mac->radio_config.pdsch_AntennaPorts.XP);
@@ -744,6 +761,8 @@ static void pf_dl(module_id_t module_id,
             frame,
             slot);
       iterator++;
+      if (gnb_pf_diag_enabled)
+        pf_dl_cce_fail++;
       // printf("[%d.%d] could not find free CCE for DL DCI \n", frame, slot);
       continue;
     }
@@ -761,9 +780,13 @@ static void pf_dl(module_id_t module_id,
             frame,
             slot);
       iterator++;
+      if (gnb_pf_diag_enabled)
+        pf_dl_pucch_fail++;
       // printf("[%d.%d] could not find PUCCH for DL DCI \n", frame, slot);
       continue;
     }
+    if (gnb_pf_diag_enabled)
+      pf_dl_actual_tx++;
 
     sched_ctrl->cce_index = CCEIndex;
     fill_pdcch_vrb_map(mac,
@@ -826,6 +849,12 @@ static void pf_dl(module_id_t module_id,
     sched_pdsch->rbSize = rbSize;
     sched_pdsch->rbStart = rbStart;
     sched_pdsch->tb_size = TBS;
+    if (gnb_pf_diag_enabled) {
+      pf_dl_total_tbs += TBS;
+      if (max_rbSize > pf_dl_max_rbsize)
+        pf_dl_max_rbsize = max_rbSize;
+    }
+
     /* transmissions: directly allocate */
     n_rb_sched -= sched_pdsch->rbSize;
 
@@ -863,6 +892,72 @@ static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_
   const uint16_t bwpSize = current_BWP->BWPSize;
   const uint16_t BWPStart = current_BWP->BWPStart;
 
+  // Per-second counters for scheduler analysis
+  static int sched_calls = 0;
+  static int data_slots = 0;
+  static long long total_sched_bytes = 0;
+  static int last_report_frame = -1;
+  static int max_bytes_seen = 0;
+  static int harq_unavail_with_data = 0;
+  static int harq_unavail_total = 0;
+  static int harq_avail_min = 16;
+  static int harq_fb_max = 0;
+  static long long harq_avail_sum = 0;
+
+  if (gnb_pf_diag_enabled) {
+    sched_calls++;
+
+    // Count HARQ availability every slot
+    {
+      int avail = 0, fb = 0;
+      for (int h = sched_ctrl->available_dl_harq.head; h >= 0; h = sched_ctrl->available_dl_harq.next[h]) avail++;
+      for (int h = sched_ctrl->feedback_dl_harq.head; h >= 0; h = sched_ctrl->feedback_dl_harq.next[h]) fb++;
+      harq_avail_sum += avail;
+      if (avail < harq_avail_min) harq_avail_min = avail;
+      if (fb > harq_fb_max) harq_fb_max = fb;
+      if (avail == 0)
+        harq_unavail_total++;
+    }
+
+    if (frame % 100 == 0 && slot == 0 && frame != last_report_frame) {
+      int avail = 0, fb = 0, retx = 0;
+      for (int h = sched_ctrl->available_dl_harq.head; h >= 0; h = sched_ctrl->available_dl_harq.next[h]) avail++;
+      for (int h = sched_ctrl->feedback_dl_harq.head; h >= 0; h = sched_ctrl->feedback_dl_harq.next[h]) fb++;
+      for (int h = sched_ctrl->retrans_dl_harq.head; h >= 0; h = sched_ctrl->retrans_dl_harq.next[h]) retx++;
+      printf("[DL-SCHED] %d.%d bwpId=%ld BWPSize=%d BWPStart=%d dci_format=%d coresetId=%d tda=%d sym=%d+%d\n",
+            frame, slot, current_BWP->bwp_id, bwpSize, BWPStart, current_BWP->dci_format, coresetid, tda, startSymbolIndex, nrOfSymbols);
+      printf("[DL-SCHED] UE %04x: HARQ now: avail=%d feedback=%d retrans=%d | total_bytes=%d dl_lc_num=%d rrc_timer=%d\n",
+            UE->rnti, avail, fb, retx, sched_ctrl->num_total_bytes, sched_ctrl->dl_lc_num, sched_ctrl->rrc_processing_timer);
+      printf("[DL-SCHED] STATS: sched_calls=%d data_slots=%d total_sched_bytes=%lld max_bytes_seen=%d\n",
+            sched_calls, data_slots, total_sched_bytes, max_bytes_seen);
+      printf("[DL-SCHED] HARQ: unavail_total=%d unavail_with_data=%d avail_min=%d fb_max=%d avg_avail=%.1f\n",
+            harq_unavail_total, harq_unavail_with_data, harq_avail_min, harq_fb_max,
+            sched_calls > 0 ? (float)harq_avail_sum / sched_calls : 0.0f);
+      printf("[DL-SCHED] SCHED: actual_tx=%d retx=%d pucch_fail=%d(dai=%d,vrb=%d) cce_fail=%d total_tbs=%lld avg_tbs=%lld max_rbsize=%d\n",
+            pf_dl_actual_tx, pf_dl_retx, pf_dl_pucch_fail, g_pucch_fail_dai, g_pucch_fail_vrb, pf_dl_cce_fail,
+            pf_dl_total_tbs, pf_dl_actual_tx > 0 ? pf_dl_total_tbs / pf_dl_actual_tx : 0,
+            pf_dl_max_rbsize);
+      sched_calls = 0;
+      data_slots = 0;
+      total_sched_bytes = 0;
+      max_bytes_seen = 0;
+      harq_unavail_with_data = 0;
+      harq_unavail_total = 0;
+      harq_avail_min = 16;
+      harq_fb_max = 0;
+      harq_avail_sum = 0;
+      last_report_frame = frame;
+      pf_dl_pucch_fail = 0;
+      pf_dl_cce_fail = 0;
+      g_pucch_fail_dai = 0;
+      g_pucch_fail_vrb = 0;
+      pf_dl_actual_tx = 0;
+      pf_dl_retx = 0;
+      pf_dl_total_tbs = 0;
+      pf_dl_max_rbsize = 0;
+    }
+  }
+
   const uint16_t slbitmap = SL_to_bitmap(startSymbolIndex, nrOfSymbols);
   uint16_t *vrb_map = RC.nrmac[module_id]->common_channels[CC_id].vrb_map;
   uint16_t rballoc_mask[bwpSize];
@@ -879,8 +974,21 @@ static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_
     }
   }
 
+  if (gnb_pf_diag_enabled && frame % 100 == 0 && slot == 0)
+    printf("[DL-SCHED] %d.%d n_rb_sched=%d (of bwpSize=%d)\n", frame, slot, n_rb_sched, bwpSize);
+
   /* Retrieve amount of data to send for this UE */
   nr_store_dlsch_buffer(module_id, frame, slot);
+
+  // Track post-store buffer status
+  if (gnb_pf_diag_enabled && sched_ctrl->num_total_bytes > 0) {
+    data_slots++;
+    total_sched_bytes += sched_ctrl->num_total_bytes;
+    if (sched_ctrl->num_total_bytes > max_bytes_seen)
+      max_bytes_seen = sched_ctrl->num_total_bytes;
+    if (sched_ctrl->available_dl_harq.head < 0)
+      harq_unavail_with_data++;
+  }
 
   int bw = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
   int average_agg_level = 4; // TODO find a better estimation

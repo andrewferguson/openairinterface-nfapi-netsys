@@ -61,6 +61,7 @@
 //#define DEBUG_DCI
 
 extern RAN_CONTEXT_t RC;
+static const bool bwp_cfg_log_enabled = false;
 
 // CQI TABLES (10 times the value in 214 to adequately compare with R)
 // Table 1 (38.214 5.2.2.1-2)
@@ -2292,6 +2293,14 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
                          NR_UL_DCI_FORMAT_0_1 : NR_UL_DCI_FORMAT_0_0) :
                          NR_UL_DCI_FORMAT_0_0;
 
+    if (bwp_cfg_log_enabled) {
+      printf("[BWP-CFG] UE: bwpId=%ld BWPSize=%d BWPStart=%d DL_dci=%d UL_dci=%d SS_type=%d SS_id=%ld coreset=%ld target_ss=%d\n",
+             DL_BWP->bwp_id, DL_BWP->BWPSize, DL_BWP->BWPStart, DL_BWP->dci_format, UL_BWP->dci_format,
+             (long)sched_ctrl->search_space->searchSpaceType->present, sched_ctrl->search_space->searchSpaceId,
+             sched_ctrl->coreset->controlResourceSetId, target_ss);
+      fflush(stdout);
+    }
+
     set_max_fb_time(UL_BWP, DL_BWP);
     set_sched_pucch_list(sched_ctrl, UL_BWP, scc);
   }
@@ -2325,6 +2334,10 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
 
     UL_BWP->dci_format = NR_UL_DCI_FORMAT_0_0;
     DL_BWP->dci_format = NR_DL_DCI_FORMAT_1_0;
+    if (bwp_cfg_log_enabled) {
+      printf("[BWP-CFG] RA override: forcing DCI 1_0/0_0 for RA\n");
+      fflush(stdout);
+    }
   }
 
   // Set MCS tables
@@ -2353,6 +2366,35 @@ void reset_srs_stats(NR_UE_info_t *UE) {
   if (UE) {
     UE->mac_stats.srs_stats[0] = '\0';
   }
+}
+
+static void log_nr_ue_counts(gNB_MAC_INST *nr_mac, const char *event, rnti_t rnti)
+{
+  NR_UEs_t *UE_info = &nr_mac->UE_info;
+  int total = 0;
+  int msg4_acked = 0;
+  int with_cellgroup = 0;
+
+  NR_SCHED_LOCK(&UE_info->mutex);
+  for (int i = 0; i < MAX_MOBILES_PER_GNB; i++) {
+    NR_UE_info_t *ue = UE_info->list[i];
+    if (!ue)
+      continue;
+    total++;
+    if (ue->Msg4_ACKed)
+      msg4_acked++;
+    if (ue->CellGroup)
+      with_cellgroup++;
+  }
+  NR_SCHED_UNLOCK(&UE_info->mutex);
+
+  printf("[UE-COUNT] event=%s rnti=%04x total=%d msg4_acked=%d cellgroup=%d\n",
+         event,
+         rnti,
+         total,
+         msg4_acked,
+         with_cellgroup);
+  fflush(stdout);
 }
 
 //------------------------------------------------------------------------------
@@ -2436,6 +2478,7 @@ NR_UE_info_t *add_new_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rntiP, NR_CellGroupConf
   NR_SCHED_UNLOCK(&UE_info->mutex);
 
   LOG_D(NR_MAC, "Add NR rnti %x\n", rntiP);
+  log_nr_ue_counts(nr_mac, "add", rntiP);
   dump_nr_list(UE_info->list);
   return (UE);
 }
@@ -2457,7 +2500,10 @@ void set_sched_pucch_list(NR_UE_sched_ctrl_t *sched_ctrl,
   }
   else if (list_size > sched_ctrl->sched_pucch_size) {
     sched_ctrl->sched_pucch = realloc(sched_ctrl->sched_pucch, list_size * sizeof(*sched_ctrl->sched_pucch));
-    for(int i=sched_ctrl->sched_pucch_size; i<list_size; i++){
+    /* Clear ALL entries: the index mapping changes when sched_pucch_size changes
+     * (get_pucch_index uses modulo sched_pucch_size), so old entries at indices
+     * 0..old_size-1 may no longer correspond to their stored frame/slot values. */
+    for(int i = 0; i < list_size; i++){
       NR_sched_pucch_t *curr_pucch = &sched_ctrl->sched_pucch[i];
       memset(curr_pucch, 0, sizeof(*curr_pucch));
     }
@@ -2566,6 +2612,7 @@ void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti)
   memcpy(UE_info->list, newUEs, sizeof(UE_info->list));
   NR_SCHED_UNLOCK(&UE_info->mutex);
 
+  log_nr_ue_counts(nr_mac, "remove", rnti);
   delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
 }
 
@@ -2993,9 +3040,7 @@ void UL_tti_req_ahead_initialization(gNB_MAC_INST * gNB, NR_ServingCellConfigCom
   if(gNB->UL_tti_req_ahead[CCid])
     return;
 
-  int size = n;
-  if (scs == 0)
-    size <<= 1; // to have enough room for feedback possibly beyond the frame we need a larger array at 15kHz SCS
+  int size = n << 1; // double to have room for Msg3 scheduled beyond current frame
 
   gNB->UL_tti_req_ahead_size = size;
   gNB->UL_tti_req_ahead[CCid] = calloc(size, sizeof(nfapi_nr_ul_tti_request_t));
@@ -3046,6 +3091,12 @@ void prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
 
   UE->CellGroup = cellGroupConfig;
   process_CellGroup(cellGroupConfig, UE);
+
+  /* Re-run BWP configuration now that UE has a full CellGroup with
+   * spCellConfigDedicated (UE-specific search space, DCI 1_1, dedicated CORESET).
+   * The initial configure_UE_BWP() in add_new_nr_ue() ran with CellGroup==NULL
+   * and fell back to CSS / DCI 1_0 limited to CORESET 0 size. */
+  configure_UE_BWP(mac, scc, &UE->UE_sched_ctrl, NULL, UE, -1, -1);
 
   /* activate SRB0 */
   nr_rlc_activate_srb0(UE->rnti, UE, send_initial_ul_rrc_message);

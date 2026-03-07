@@ -1264,7 +1264,16 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
 {
   NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_id];
   current_harq->active = true;
-  current_harq->ack_received = false;
+  /* In emulated L1, DLSCH decoding always succeeds and the PDSCH indication
+   * may arrive after the PUCCH slot fires (race condition with low K1).
+   * Pre-set ack_received=true at DCI time so the PUCCH handler always sends
+   * ACK=1 instead of a spurious NACK. */
+  if (get_softmodem_params()->emulate_l1) {
+    current_harq->ack_received = true;
+    current_harq->ack = 1;
+  } else {
+    current_harq->ack_received = false;
+  }
   current_harq->pucch_resource_indicator = pucch_id;
   current_harq->dai = dai;
   current_harq->j_dai = 0;

@@ -55,6 +55,11 @@
 
 const uint8_t nr_rv_round_map[4] = {0, 2, 3, 1};
 
+static inline uint8_t get_sched_scs(const NR_ServingCellConfigCommon_t *scc)
+{
+  return scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+}
+
 void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
                                 int CC_idP,
                                 frame_t frameP,
@@ -66,9 +71,10 @@ void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
   /* called below and in simulators, so we assume a lock but don't require it */
 
   NR_ServingCellConfigCommon_t *scc = gNB->common_channels->ServingCellConfigCommon;
-  const int num_slots = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+  const uint8_t sched_scs = get_sched_scs(scc);
+  const int num_slots = nr_slots_per_frame[sched_scs];
 
-  UL_tti_req_ahead_initialization(gNB, scc, num_slots, CC_idP, frameP, slotP, *scc->ssbSubcarrierSpacing);
+  UL_tti_req_ahead_initialization(gNB, scc, num_slots, CC_idP, frameP, slotP, sched_scs);
 
   nfapi_nr_dl_tti_pdcch_pdu_rel15_t **pdcch = (nfapi_nr_dl_tti_pdcch_pdu_rel15_t **)gNB->pdcch_pdu_idx[CC_idP];
 
@@ -150,6 +156,8 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
   gNB_MAC_INST *gNB = RC.nrmac[module_idP];
   NR_COMMON_channels_t *cc = gNB->common_channels;
   NR_ServingCellConfigCommon_t        *scc     = cc->ServingCellConfigCommon;
+  const uint8_t sched_scs = get_sched_scs(scc);
+  const int num_slots = nr_slots_per_frame[sched_scs];
 
   NR_SCHED_LOCK(&gNB->sched_lock);
 
@@ -170,11 +178,11 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_IN);
 
   /* send tick to RLC, PDCP, and X2AP every ms */
-  if ((slot & ((1 << *scc->ssbSubcarrierSpacing) - 1)) == 0) {
+  if ((slot & ((1 << sched_scs) - 1)) == 0) {
     void nr_rlc_tick(int frame, int subframe);
     void nr_pdcp_tick(int frame, int subframe);
-    nr_rlc_tick(frame, slot >> *scc->ssbSubcarrierSpacing);
-    nr_pdcp_tick(frame, slot >> *scc->ssbSubcarrierSpacing);
+    nr_rlc_tick(frame, slot >> sched_scs);
+    nr_pdcp_tick(frame, slot >> sched_scs);
     if (is_x2ap_enabled())
       x2ap_trigger();
   }
@@ -185,7 +193,6 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
     // clear vrb_maps
     memset(cc[CC_id].vrb_map, 0, sizeof(uint16_t) * MAX_BWP_SIZE);
     // clear last scheduled slot's content (only)!
-    const int num_slots = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
     const int size = gNB->vrb_map_UL_size;
     const int prev_slot = frame * num_slots + slot + size - 1;
     uint16_t *vrb_map_UL = cc[CC_id].vrb_map_UL;
@@ -217,14 +224,14 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
        slot, because otherwise we would allocate the current slot in
        UL_tti_req_ahead), but be aware that, e.g., K2 is allowed to be larger
        (schedule_nr_prach will assert if resources are not free). */
-    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1;
-    const frame_t f = (frame + (slot + n_slots_ahead) / nr_slots_per_frame[*scc->ssbSubcarrierSpacing]) % 1024;
-    const sub_frame_t s = (slot + n_slots_ahead) % nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+    const sub_frame_t n_slots_ahead = num_slots - 1;
+    const frame_t f = (frame + (slot + n_slots_ahead) / num_slots) % 1024;
+    const sub_frame_t s = (slot + n_slots_ahead) % num_slots;
     schedule_nr_prach(module_idP, f, s);
   }
 
   // Schedule CSI-RS transmission
-  nr_csirs_scheduling(module_idP, frame, slot, nr_slots_per_frame[*scc->ssbSubcarrierSpacing], &sched_info->DL_req);
+  nr_csirs_scheduling(module_idP, frame, slot, num_slots, &sched_info->DL_req);
 
   // Schedule CSI measurement reporting
   nr_csi_meas_reporting(module_idP, frame, slot);
@@ -237,13 +244,14 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
     nr_schedule_RA(module_idP, frame, slot, &sched_info->UL_dci_req, &sched_info->DL_req, &sched_info->TX_req);
   }
 
-  // This schedules the DCI for Uplink and subsequently PUSCH
-  nr_schedule_ulsch(module_idP, frame, slot, &sched_info->UL_dci_req);
-
-  // This schedules the DCI for Downlink and PDSCH
+  // This schedules the DCI for Downlink and PDSCH (must run before ULSCH so that
+  // PUCCH resources are reserved in vrb_map_UL before PUSCH allocation)
   start_meas(&gNB->schedule_dlsch);
   nr_schedule_ue_spec(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
   stop_meas(&gNB->schedule_dlsch);
+
+  // This schedules the DCI for Uplink and subsequently PUSCH
+  nr_schedule_ulsch(module_idP, frame, slot, &sched_info->UL_dci_req);
 
   nr_sr_reporting(gNB, frame, slot);
 
@@ -253,7 +261,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
    * is more than 1 CC supported?
    */
   AssertFatal(MAX_NUM_CCs == 1, "only 1 CC supported\n");
-  const int current_index = ul_buffer_index(frame, slot, *scc->ssbSubcarrierSpacing, gNB->UL_tti_req_ahead_size);
+  const int current_index = ul_buffer_index(frame, slot, sched_scs, gNB->UL_tti_req_ahead_size);
   copy_ul_tti_req(&sched_info->UL_tti_req, &gNB->UL_tti_req_ahead[0][current_index]);
 
   stop_meas(&gNB->eNB_scheduler);

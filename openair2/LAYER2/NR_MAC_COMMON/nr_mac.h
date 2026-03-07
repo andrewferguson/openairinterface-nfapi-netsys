@@ -126,6 +126,11 @@ static inline int get_mac_len(uint8_t* pdu, int pdu_len, uint16_t *mac_ce_len, u
     *mac_subheader_len = sizeof(*s);
     *mac_ce_len = s->L;
   }
+  if ((int)(*mac_subheader_len + *mac_ce_len) > pdu_len) {
+    LOG_W(NR_MAC, "MAC sub-PDU header+payload length (%d+%d=%d) exceeds remaining PDU length %d\n",
+          *mac_subheader_len, *mac_ce_len, *mac_subheader_len + *mac_ce_len, pdu_len);
+    return false;
+  }
   return true;
 }
     

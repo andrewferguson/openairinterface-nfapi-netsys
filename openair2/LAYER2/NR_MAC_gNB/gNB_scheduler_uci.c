@@ -26,6 +26,15 @@
  * \company Eurecom
  */
 
+/* Diagnostic counters for pucch_fail root-cause analysis */
+int g_pucch_fail_dai = 0;  /* iterations skipped due to dai_c==2 (capacity full) */
+int g_pucch_fail_vrb = 0;  /* iterations skipped due to VRB occupation */
+/* Diagnostic counters for HARQ feedback matching in UCI handling */
+int g_harq_find_reorder = 0; /* emulation fallback: matching HARQ found deeper in feedback list */
+int g_harq_find_miss = 0;    /* no matching HARQ found for received feedback bit */
+int g_harq_find_past = 0;    /* HARQ feedback considered in the past and forced to retransmit */
+int g_harq_find_future = 0;  /* HARQ feedback considered in the future */
+
 #include <softmodem-common.h>
 #include "NR_MAC_gNB/nr_mac_gNB.h"
 #include "NR_MAC_COMMON/nr_mac_extern.h"
@@ -36,6 +45,38 @@
 
 extern RAN_CONTEXT_t RC;
 
+static bool should_log_unknown_uci_rnti(uint32_t *counter)
+{
+  (*counter)++;
+  /* Log early samples, then periodically to avoid flooding scheduler logs. */
+  return (*counter <= 10) || ((*counter % 200) == 0);
+}
+
+static void log_msg4_acked_count(const gNB_MAC_INST *nrmac, rnti_t rnti, frame_t frame, sub_frame_t slot)
+{
+  int total = 0;
+  int msg4_acked = 0;
+  int with_cellgroup = 0;
+  for (int i = 0; i < MAX_MOBILES_PER_GNB; i++) {
+    NR_UE_info_t *ue = nrmac->UE_info.list[i];
+    if (!ue)
+      continue;
+    total++;
+    if (ue->Msg4_ACKed)
+      msg4_acked++;
+    if (ue->CellGroup)
+      with_cellgroup++;
+  }
+
+  printf("[UE-COUNT] event=msg4_acked rnti=%04x at=%4d.%2d total=%d msg4_acked=%d cellgroup=%d\n",
+         rnti,
+         frame,
+         slot,
+         total,
+         msg4_acked,
+         with_cellgroup);
+  fflush(stdout);
+}
 
 
 static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac,
@@ -158,9 +199,43 @@ static int get_pucch_index(int frame, int slot, int n_slots_frame, const NR_TDD_
   const int ul_period_start  = (slot / nr_slots_period) * n_ul_slots_period;
   // ((slot % nr_slots_period) - first_ul_slot_period) gives the progressive number of the slot in this TDD period
   const int ul_period_slot   = (slot % nr_slots_period) - first_ul_slot_period;
+  // If ul_period_slot < 0, the slot is a DL slot (before the first UL slot in its period).
+  // Return -1 to indicate an invalid/non-UL slot — callers must check for this.
+  if (ul_period_slot < 0)
+    return -1;
   // the sum gives the index of current UL slot in the frame which is normalized wrt sched_pucch_size
   return (frame_start + ul_period_start + ul_period_slot) % sched_pucch_size;
 
+}
+
+static bool has_matching_pucch_resource(const NR_PUCCH_Config_t *pucch_Config, int O_uci, int pucch_resource)
+{
+  if (!pucch_Config || !pucch_Config->resourceSetToAddModList)
+    return false;
+
+  const int n_set = pucch_Config->resourceSetToAddModList->list.count;
+  int N2 = 2;
+
+  for (int i = 0; i < n_set; i++) {
+    NR_PUCCH_ResourceSet_t *pucchresset = pucch_Config->resourceSetToAddModList->list.array[i];
+    if (!pucchresset)
+      continue;
+    const int n_list = pucchresset->resourceList.list.count;
+    if (n_list <= 0)
+      continue;
+
+    if (pucchresset->pucch_ResourceSetId == 0 && O_uci < 3)
+      return pucch_resource < n_list;
+
+    if (pucchresset->pucch_ResourceSetId == 1 && O_uci > 2) {
+      const int N3 = pucchresset->maxPayloadSize != NULL ? *pucchresset->maxPayloadSize : 1706;
+      if (N2 < O_uci && N3 > O_uci)
+        return pucch_resource < n_list;
+      N2 = N3;
+    }
+  }
+
+  return false;
 }
 
 void nr_schedule_pucch(gNB_MAC_INST *nrmac,
@@ -181,10 +256,17 @@ void nr_schedule_pucch(gNB_MAC_INST *nrmac,
     const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
     AssertFatal(tdd || nrmac->common_channels[0].frame_type == FDD, "Dynamic TDD not handled yet\n");
     const int pucch_index = get_pucch_index(frameP, slotP, n_slots_frame, tdd, sched_ctrl->sched_pucch_size);
+    if (pucch_index < 0)
+      continue; // slotP is not a UL slot (DL slot passed by broken ulsch_slot_bitmap)
     NR_sched_pucch_t *curr_pucch = &UE->UE_sched_ctrl.sched_pucch[pucch_index];
     if (!curr_pucch->active)
       continue;
-    DevAssert(frameP == curr_pucch->frame && slotP == curr_pucch->ul_slot);
+    if (frameP != curr_pucch->frame || slotP != curr_pucch->ul_slot) {
+      LOG_E(NR_MAC, "PUCCH slot mismatch: current %d.%d, stored %d.%d, pucch_index %d sched_pucch_size %d, clearing stale entry\n",
+            frameP, slotP, curr_pucch->frame, curr_pucch->ul_slot, pucch_index, sched_ctrl->sched_pucch_size);
+      memset(curr_pucch, 0, sizeof(*curr_pucch));
+      continue;
+    }
 
     const uint16_t O_ack = curr_pucch->dai_c;
     const uint16_t O_csi = curr_pucch->csi_bits;
@@ -781,7 +863,13 @@ static void evaluate_cqi_report(uint8_t *payload,
   // TODO for wideband case and multiple TB
   const int cqi_idx = sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.wb_cqi_1tb;
   const int mcs_table = UE->current_DL_BWP.mcsTableIdx;
-  sched_ctrl->dl_max_mcs = get_mcs_from_cqi(mcs_table, cqi_Table, cqi_idx);
+  if (get_softmodem_params()->emulate_l1) {
+    /* In L1 emulation the reported CQI is not representative of RF channel quality.
+     * Avoid CQI-driven MCS clamping to keep DL scheduler near peak spectral efficiency. */
+    sched_ctrl->dl_max_mcs = mcs_table == 1 ? 27 : 28;
+  } else {
+    sched_ctrl->dl_max_mcs = get_mcs_from_cqi(mcs_table, cqi_Table, cqi_idx);
+  }
 }
 
 static uint8_t evaluate_pmi_report(uint8_t *payload,
@@ -936,6 +1024,33 @@ static void extract_pucch_csi_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
   }
 }
 
+/* Return -1 if expected feedback is in the past, +1 if in the future, 0 if exact match. */
+static int feedback_time_relation(frame_t expected_frame,
+                                  sub_frame_t expected_slot,
+                                  frame_t frame,
+                                  sub_frame_t slot,
+                                  int n_slots_frame)
+{
+  const int total_slots = 1024 * n_slots_frame;
+  const int expected_abs = expected_frame * n_slots_frame + expected_slot;
+  const int current_abs = frame * n_slots_frame + slot;
+  const int delta = (current_abs - expected_abs + total_slots) % total_slots;
+  if (delta == 0)
+    return 0;
+  return delta < (total_slots / 2) ? -1 : 1;
+}
+
+static int find_feedback_pid_exact(frame_t frame, sub_frame_t slot, NR_UE_info_t *UE)
+{
+  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+  for (int pid = sched_ctrl->feedback_dl_harq.head; pid >= 0; pid = sched_ctrl->feedback_dl_harq.next[pid]) {
+    NR_UE_harq_t *harq = &sched_ctrl->harq_processes[pid];
+    if (harq->feedback_frame == frame && harq->feedback_slot == slot)
+      return pid;
+  }
+  return -1;
+}
+
 static NR_UE_harq_t *find_harq(frame_t frame, sub_frame_t slot, NR_UE_info_t * UE, int harq_round_max)
 {
   /* In case of realtime problems: we can only identify a HARQ process by
@@ -945,41 +1060,65 @@ static NR_UE_harq_t *find_harq(frame_t frame, sub_frame_t slot, NR_UE_info_t * U
    * Similarly, we might be "in advance", in which case we need to skip
    * this result. */
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  int8_t pid = sched_ctrl->feedback_dl_harq.head;
+  const int n_slots_frame = nr_slots_per_frame[UE->current_UL_BWP.scs];
+  const bool emul_l1 = get_softmodem_params()->emulate_l1;
+  int pid = sched_ctrl->feedback_dl_harq.head;
   if (pid < 0)
     return NULL;
-  NR_UE_harq_t *harq = &sched_ctrl->harq_processes[pid];
+
+  NR_UE_harq_t *harq = NULL;
   /* old feedbacks we missed: mark for retransmission */
-  while (harq->feedback_frame != frame
-         || (harq->feedback_frame == frame && harq->feedback_slot < slot)) {
-    LOG_W(NR_MAC,
-          "UE %04x expected HARQ pid %d feedback at %4d.%2d, but is at %4d.%2d instead (HARQ feedback is in the past)\n",
-          UE->rnti,
-          pid,
-          harq->feedback_frame,
-          harq->feedback_slot,
-          frame,
-          slot);
-    remove_front_nr_list(&sched_ctrl->feedback_dl_harq);
-    handle_dl_harq(UE, pid, 0, harq_round_max);
-    pid = sched_ctrl->feedback_dl_harq.head;
-    if (pid < 0)
-      return NULL;
+  while (pid >= 0) {
     harq = &sched_ctrl->harq_processes[pid];
+    const int relation = feedback_time_relation(harq->feedback_frame, harq->feedback_slot, frame, slot, n_slots_frame);
+    if (relation == 0)
+      return harq;
+    if (relation < 0) {
+      g_harq_find_past++;
+      LOG_W(NR_MAC,
+            "UE %04x expected HARQ pid %d feedback at %4d.%2d, but is at %4d.%2d instead (HARQ feedback is in the past)\n",
+            UE->rnti,
+            pid,
+            harq->feedback_frame,
+            harq->feedback_slot,
+            frame,
+            slot);
+      remove_front_nr_list(&sched_ctrl->feedback_dl_harq);
+      handle_dl_harq(UE, pid, 0, harq_round_max);
+      pid = sched_ctrl->feedback_dl_harq.head;
+      continue;
+    }
+    break;
   }
-  /* feedbacks that we wait for in the future: don't do anything */
-  if (harq->feedback_slot > slot) {
+
+  if (emul_l1) {
+    /* In emulated-L1, delayed/OOO UCI can reorder ACK arrival versus enqueue order.
+     * Look for exact slot match and move it to list head to preserve existing consumers. */
+    const int matched_pid = find_feedback_pid_exact(frame, slot, UE);
+    if (matched_pid >= 0) {
+      if (matched_pid != sched_ctrl->feedback_dl_harq.head) {
+        remove_nr_list(&sched_ctrl->feedback_dl_harq, matched_pid);
+        add_front_nr_list(&sched_ctrl->feedback_dl_harq, matched_pid);
+        g_harq_find_reorder++;
+      }
+      return &sched_ctrl->harq_processes[matched_pid];
+    }
+  }
+
+  if (pid >= 0) {
+    g_harq_find_future++;
     LOG_W(NR_MAC,
           "UE %04x expected HARQ pid %d feedback at %4d.%2d, but is at %4d.%2d instead (HARQ feedback is in the future)\n",
           UE->rnti,
           pid,
-          harq->feedback_frame,
-          harq->feedback_slot,
+          sched_ctrl->harq_processes[pid].feedback_frame,
+          sched_ctrl->harq_processes[pid].feedback_slot,
           frame,
           slot);
-    return NULL;
   }
-  return harq;
+
+  g_harq_find_miss++;
+  return NULL;
 }
 
 void handle_nr_uci_pucch_0_1(module_id_t mod_id,
@@ -991,7 +1130,15 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
   NR_SCHED_LOCK(&nrmac->sched_lock);
   NR_UE_info_t * UE = find_nr_UE(&nrmac->UE_info, uci_01->rnti);
   if (!UE) {
-    LOG_E(NR_MAC, "%s(): unknown RNTI %04x in PUCCH UCI\n", __func__, uci_01->rnti);
+    static uint32_t unknown_uci_01_count = 0;
+    if (should_log_unknown_uci_rnti(&unknown_uci_01_count))
+      LOG_W(NR_MAC,
+            "%s(): unknown RNTI %04x in PUCCH UCI at %4d.%2d (count=%u)\n",
+            __func__,
+            uci_01->rnti,
+            frame,
+            slot,
+            unknown_uci_01_count);
     NR_SCHED_UNLOCK(&nrmac->sched_lock);
     return;
   }
@@ -1004,7 +1151,10 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
       const uint8_t harq_confidence = uci_01->harq.harq_confidence_level;
       NR_UE_harq_t *harq = find_harq(frame, slot, UE, nrmac->dl_bler.harq_round_max);
       if (!harq) {
-        LOG_E(NR_MAC, "UE %04x: Could not find a HARQ process at %4d.%2d!\n", UE->rnti, frame, slot);
+        if (get_softmodem_params()->emulate_l1)
+          LOG_W(NR_MAC, "UE %04x: Could not find a HARQ process at %4d.%2d!\n", UE->rnti, frame, slot);
+        else
+          LOG_E(NR_MAC, "UE %04x: Could not find a HARQ process at %4d.%2d!\n", UE->rnti, frame, slot);
         break;
       }
       DevAssert(harq->is_waiting);
@@ -1012,8 +1162,10 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
       remove_front_nr_list(&sched_ctrl->feedback_dl_harq);
       LOG_I(NR_MAC,"%4d.%2d bit %d pid %d ack/nack %d\n",frame, slot, harq_bit,pid,harq_value);
       handle_dl_harq(UE, pid, harq_value == 0 && harq_confidence == 0, nrmac->dl_bler.harq_round_max);
-      if (!UE->Msg4_ACKed && harq_value == 0 && harq_confidence == 0)
+      if (!UE->Msg4_ACKed && harq_value == 0 && harq_confidence == 0) {
         UE->Msg4_ACKed = true;
+        log_msg4_acked_count(nrmac, UE->rnti, frame, slot);
+      }
       if (harq_confidence == 1)  UE->mac_stats.pucch0_DTX++;
     }
 
@@ -1048,7 +1200,15 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
   NR_UE_info_t * UE = find_nr_UE(&nrmac->UE_info, uci_234->rnti);
   if (!UE) {
     NR_SCHED_UNLOCK(&nrmac->sched_lock);
-    LOG_E(NR_MAC, "%s(): unknown RNTI %04x in PUCCH UCI\n", __func__, uci_234->rnti);
+    static uint32_t unknown_uci_234_count = 0;
+    if (should_log_unknown_uci_rnti(&unknown_uci_234_count))
+      LOG_W(NR_MAC,
+            "%s(): unknown RNTI %04x in PUCCH UCI at %4d.%2d (count=%u)\n",
+            __func__,
+            uci_234->rnti,
+            frame,
+            slot,
+            unknown_uci_234_count);
     return;
   }
 
@@ -1212,7 +1372,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
    * called often, don't try to lock every time */
 
   const int CC_id = 0;
-  const int minfbtime = mac->radio_config.minRXTXTIME;
+  int minfbtime = mac->radio_config.minRXTXTIME;
   const NR_ServingCellConfigCommon_t *scc = mac->common_channels[CC_id].ServingCellConfigCommon;
   const NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   const int n_slots_frame = nr_slots_per_frame[ul_bwp->scs];
@@ -1220,9 +1380,12 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
   AssertFatal(tdd || mac->common_channels[CC_id].frame_type == FDD, "Dynamic TDD not handled yet\n");
   const int nr_slots_period = tdd ? n_slots_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : n_slots_frame;
   const int first_ul_slot_period = tdd ? get_first_ul_slot(tdd->nrofDownlinkSlots, tdd->nrofDownlinkSymbols, tdd->nrofUplinkSymbols) : 0;
-
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   NR_PUCCH_Config_t *pucch_Config = ul_bwp->pucch_Config;
+
+  const bool emul_connected = get_softmodem_params()->emulate_l1 && is_common == 0;
+  if (emul_connected && minfbtime < 13)
+    minfbtime = 13;
 
   const int bwp_start = ul_bwp->BWPStart;
   const int bwp_size = ul_bwp->BWPSize;
@@ -1256,12 +1419,15 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
         curr_pucch->ul_slot == pucch_slot) { // if there is already a PUCCH in given frame and slot
       LOG_D(NR_MAC, "pucch_acknack DL %4d.%2d, UL_ACK %4d.%2d Bits already in current PUCCH: DAI_C %d CSI %d\n",
             frame, slot, pucch_frame, pucch_slot, curr_pucch->dai_c, curr_pucch->csi_bits);
-      // we can't schedule if short pucch is already full
-        if (curr_pucch->csi_bits == 0 &&
-            curr_pucch->dai_c == 2){
-        // printf("[%d.%d] PUCCH is full, cannot schedule\n",  frame, slot);
-        continue;
-          }
+      // for pure HARQ-ACK, short PUCCH is full at 2 bits; continue only if a
+      // matching O_uci>2 resource exists (typically in resource set 1)
+      if (curr_pucch->csi_bits == 0 && curr_pucch->dai_c == 2) {
+        const int next_O_uci = curr_pucch->csi_bits + (curr_pucch->dai_c + 1) + 2;
+        if (!has_matching_pucch_resource(pucch_Config, next_O_uci, curr_pucch->resource_indicator)) {
+          g_pucch_fail_dai++;
+          continue;
+        }
+      }
       // if there is CSI but simultaneous HARQ+CSI is disable we can't schedule
       if (curr_pucch->csi_bits > 0 && !curr_pucch->simultaneous_harqcsi){
         // printf("[%d.%d] PUCCH is full, cannot schedule\n",  frame, slot);
@@ -1305,7 +1471,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
         LOG_D(NR_MAC, "DL %4d.%2d, UL_ACK %4d.%2d PRB resources for this occasion are already occupied, move to the following occasion\n",
               frame, slot, pucch_frame, pucch_slot);
         // printf("DL %4d.%2d, UL_ACK %4d.%2d PRB resources for this occasion are already occupied, move to the following occasion\n",     frame, slot, pucch_frame, pucch_slot);
-
+        g_pucch_fail_vrb++;
         continue;
       }
       // allocating a new PUCCH structure for this occasion
@@ -1417,4 +1583,3 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
     }
   }
 }
-
