@@ -32,6 +32,8 @@
 #include "openair1/PHY/defs_gNB.h"
 #define FAPI2_IP_DSCP	0
 
+extern uint32_t gnb_ip_addr;
+
 extern RAN_CONTEXT_t RC;
 
 nfapi_vnf_p7_config_t* nfapi_vnf_p7_config_create()
@@ -140,7 +142,7 @@ int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(config->port);
-	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_addr.s_addr = gnb_ip_addr;
 
 	// bind to the configured port
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 binding too %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
@@ -290,7 +292,7 @@ int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(config->port);
-	addr.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_addr.s_addr = gnb_ip_addr;
 
 	// bind to the configured port
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 binding too %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));

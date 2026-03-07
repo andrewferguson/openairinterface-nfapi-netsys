@@ -22,6 +22,7 @@
 
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 #include <sched.h>
+#include <arpa/inet.h>
 
 
 #include "T.h"
@@ -618,9 +619,41 @@ static void initialize_agent(ngran_node_t node_type, e2_agent_args_t oai_args)
 }
 #endif
 
+uint32_t gnb_ip_addr;
+
+void fill_gnb_ip_addr(void)
+{
+  FILE *fptr = fopen("/gnb_ip_addr", "r");
+  if (fptr == NULL) {
+    printf("Unable to open /gnb_ip_addr, defaulting IP to INADDR_ANY\n");
+    gnb_ip_addr = INADDR_ANY;
+    return;
+  }
+
+  char gnb_ip_addr_str[16] = {0};
+  if (fgets(gnb_ip_addr_str, sizeof(gnb_ip_addr_str), fptr) == NULL) {
+    fclose(fptr);
+    printf("Unable to read /gnb_ip_addr, defaulting IP to INADDR_ANY\n");
+    gnb_ip_addr = INADDR_ANY;
+    return;
+  }
+  fclose(fptr);
+
+  gnb_ip_addr_str[strcspn(gnb_ip_addr_str, "\r\n")] = '\0';
+  gnb_ip_addr = inet_addr(gnb_ip_addr_str);
+  if (gnb_ip_addr == INADDR_NONE && strcmp(gnb_ip_addr_str, "255.255.255.255") != 0) {
+    printf("Invalid /gnb_ip_addr value '%s', defaulting IP to INADDR_ANY\n", gnb_ip_addr_str);
+    gnb_ip_addr = INADDR_ANY;
+    return;
+  }
+
+  printf("gNB IP addr: %s (%u)\n", gnb_ip_addr_str, gnb_ip_addr);
+}
+
 configmodule_interface_t *uniqCfg = NULL;
 int main( int argc, char **argv ) {
   int ru_id, CC_id = 0;
+  fill_gnb_ip_addr();
   start_background_system();
 
   ///static configuration for NR at the moment

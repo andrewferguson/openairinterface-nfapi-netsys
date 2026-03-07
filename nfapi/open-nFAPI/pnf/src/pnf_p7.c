@@ -31,6 +31,8 @@
 
 #define FAPI2_IP_DSCP	0
 
+extern uint32_t gnb_ip_addr;
+
 extern uint16_t sf_ahead;
 
 //uint16_t sf_ahead=4;
@@ -3062,12 +3064,12 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(pnf_p7->_public.local_p7_port);
 
-	if(pnf_p7->_public.local_p7_addr == 0)
-	{
-		addr.sin_addr.s_addr = INADDR_ANY;
-	}
-	else
-	{
+		if(pnf_p7->_public.local_p7_addr == 0)
+		{
+			addr.sin_addr.s_addr = gnb_ip_addr;
+		}
+		else
+		{
 		//addr.sin_addr.s_addr = inet_addr(pnf_p7->_public.local_p7_addr);
 		if(inet_aton(pnf_p7->_public.local_p7_addr, &addr.sin_addr) == -1)
 		{
@@ -3234,12 +3236,12 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(pnf_p7->_public.local_p7_port);
 
-	if(pnf_p7->_public.local_p7_addr == 0)
-	{
-		addr.sin_addr.s_addr = INADDR_ANY;
-	}
-	else
-	{
+		if(pnf_p7->_public.local_p7_addr == 0)
+		{
+			addr.sin_addr.s_addr = gnb_ip_addr;
+		}
+		else
+		{
 		//addr.sin_addr.s_addr = inet_addr(pnf_p7->_public.local_p7_addr);
 		if(inet_aton(pnf_p7->_public.local_p7_addr, &addr.sin_addr) == -1)
 		{

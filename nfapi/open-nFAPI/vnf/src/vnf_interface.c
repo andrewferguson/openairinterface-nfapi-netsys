@@ -31,6 +31,7 @@
 
 #include "vnf.h"
 
+extern uint32_t gnb_ip_addr;
 
 
 nfapi_vnf_config_t* nfapi_vnf_config_create()
@@ -260,7 +261,7 @@ int nfapi_nr_vnf_start(nfapi_vnf_config_t* config)
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "IPV4 binding to port %d\n", config->vnf_p5_port);
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(config->vnf_p5_port);
-		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_addr.s_addr = gnb_ip_addr;
 
 		// bind to the configured address and port
 		if (bind(p5ListenSock, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)) < 0)
@@ -665,7 +666,7 @@ int nfapi_vnf_start(nfapi_vnf_config_t* config)
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "IPV4 binding to port %d\n", config->vnf_p5_port);
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(config->vnf_p5_port);
-		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_addr.s_addr = gnb_ip_addr;
 
 		// bind to the configured address and port
 		if (bind(p5ListenSock, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)) < 0)
