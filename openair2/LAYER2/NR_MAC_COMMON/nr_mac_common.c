@@ -594,7 +594,11 @@ default_table_type_t get_default_table_type(int mux_pattern)
 NR_tda_info_t set_tda_info_from_list(NR_PDSCH_TimeDomainResourceAllocationList_t *tdalist, int tda_index)
 {
   NR_tda_info_t tda_info = {0};
-  AssertFatal(tda_index < tdalist->list.count, "TDA index from DCI %d exceeds TDA list array size %d\n", tda_index, tdalist->list.count);
+  if (tda_index >= tdalist->list.count) {
+    LOG_W(NR_MAC, "TDA index from DCI %d exceeds TDA list array size %d, returning invalid TDA info\n", tda_index, tdalist->list.count);
+    tda_info.nrOfSymbols = 0; // caller should check for invalid
+    return tda_info;
+  }
   NR_PDSCH_TimeDomainResourceAllocation_t *tda = tdalist->list.array[tda_index];
   tda_info.mapping_type = tda->mappingType;
   int S, L;

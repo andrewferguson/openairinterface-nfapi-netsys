@@ -56,7 +56,13 @@ static eth_params_t         stub_eth_params;
 static nr_ue_if_module_t *nr_ue_if_module_inst[MAX_IF_MODULES];
 static int ue_tx_sock_descriptor = -1;
 static int ue_rx_sock_descriptor = -1;
-static int g_harq_pid;
+static int g_harq_pid = -1;
+/* In emulated L1, multiple DL DCIs can be in flight before RX indications.
+ * Track pending HARQ PIDs in FIFO order instead of relying on a single global. */
+#define EMUL_HARQ_FIFO_SIZE 256
+static uint8_t g_harq_pid_fifo[EMUL_HARQ_FIFO_SIZE];
+static uint16_t g_harq_fifo_head;
+static uint16_t g_harq_fifo_count;
 sem_t sfn_slot_semaphore;
 
 queue_t nr_sfn_slot_queue;
@@ -66,6 +72,33 @@ queue_t nr_tx_req_queue;
 queue_t nr_ul_dci_req_queue;
 queue_t nr_ul_tti_req_queue;
 pthread_mutex_t mac_IF_mutex;
+
+static void emul_harq_fifo_push(uint8_t harq_pid)
+{
+  if (g_harq_fifo_count == EMUL_HARQ_FIFO_SIZE) {
+    /* Drop oldest entry to keep latest scheduling context. */
+    g_harq_fifo_head = (g_harq_fifo_head + 1) % EMUL_HARQ_FIFO_SIZE;
+    g_harq_fifo_count--;
+  }
+  const uint16_t tail = (g_harq_fifo_head + g_harq_fifo_count) % EMUL_HARQ_FIFO_SIZE;
+  g_harq_pid_fifo[tail] = harq_pid;
+  g_harq_fifo_count++;
+}
+
+static bool emul_harq_fifo_pop_active(module_id_t module_id, uint8_t *harq_pid)
+{
+  NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
+  while (g_harq_fifo_count > 0) {
+    const uint8_t pid = g_harq_pid_fifo[g_harq_fifo_head];
+    g_harq_fifo_head = (g_harq_fifo_head + 1) % EMUL_HARQ_FIFO_SIZE;
+    g_harq_fifo_count--;
+    if (pid < NR_MAX_HARQ_PROCESSES && mac && mac->dl_harq_info[pid].active) {
+      *harq_pid = pid;
+      return true;
+    }
+  }
+  return false;
+}
  
 void nrue_init_standalone_socket(int tx_port, int rx_port)
 {
@@ -1194,12 +1227,29 @@ void handle_ssb_meas(NR_UE_MAC_INST_t *mac, uint8_t ssb_index, int16_t rsrp_dbm)
 // Note: sdu should always be processed because data and timing advance updates are transmitted by the UE
 int8_t handle_dlsch(nr_downlink_indication_t *dl_info, int pdu_id)
 {
-  /* L1 assigns harq_pid, but in emulated L1 mode we need to assign
-     the harq_pid based on the saved global g_harq_pid. Because we are
-     emulating L1, no antenna measurements are conducted to calculate
-     a harq_pid, therefore we must set it here. */
-  if (get_softmodem_params()->emulate_l1)
-    dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid = g_harq_pid;
+  if (get_softmodem_params()->emulate_l1) {
+    NR_UE_MAC_INST_t *mac = get_mac_inst(dl_info->module_id);
+    const uint8_t rx_harq_pid = dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid;
+    uint8_t resolved_harq_pid = rx_harq_pid;
+    bool resolved = false;
+
+    /* Prefer HARQ PID already present in RX indication if it maps to an
+     * active HARQ process; otherwise resolve from pending DCI FIFO. */
+    if (rx_harq_pid < NR_MAX_HARQ_PROCESSES && mac && mac->dl_harq_info[rx_harq_pid].active) {
+      resolved = true;
+    } else if (emul_harq_fifo_pop_active(dl_info->module_id, &resolved_harq_pid)) {
+      resolved = true;
+    } else if (g_harq_pid >= 0 && g_harq_pid < NR_MAX_HARQ_PROCESSES && mac
+               && mac->dl_harq_info[g_harq_pid].active) {
+      resolved_harq_pid = (uint8_t)g_harq_pid;
+      resolved = true;
+    } else if (rx_harq_pid < NR_MAX_HARQ_PROCESSES) {
+      resolved = true;
+    }
+
+    if (resolved)
+      dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid = resolved_harq_pid;
+  }
 
   update_harq_status(dl_info->module_id,
                      dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid,
@@ -1224,6 +1274,8 @@ int8_t handle_csirs_measurements(module_id_t module_id, frame_t frame, int slot,
   return nr_ue_process_csirs_measurements(module_id, frame, slot, csirs_measurements);
 }
 
+extern int ue_stat_decode_cnt;
+
 void update_harq_status(module_id_t module_id, uint8_t harq_pid, uint8_t ack_nack)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
@@ -1238,6 +1290,8 @@ void update_harq_status(module_id_t module_id, uint8_t harq_pid, uint8_t ack_nac
     else {
       current_harq->ack = ack_nack;
       current_harq->ack_received = true;
+      ue_stat_decode_cnt++;
+      // High-rate decode tracing disabled for throughput runs.
     }
   }
   else {
@@ -1301,6 +1355,8 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
         }
         dci_pdu_rel15_t *def_dci_pdu_rel15 = &mac->def_dci_pdu_rel15[dl_info->slot][dci_index->dci_format];
         g_harq_pid = def_dci_pdu_rel15->harq_pid;
+        if (get_softmodem_params()->emulate_l1 && g_harq_pid >= 0 && g_harq_pid < NR_MAX_HARQ_PROCESSES)
+          emul_harq_fifo_push((uint8_t)g_harq_pid);
         LOG_T(NR_MAC, "Setting harq_pid = %d and dci_index = %d (based on format)\n", g_harq_pid, dci_index->dci_format);
 
         ret_mask |= (ret << FAPI_NR_DCI_IND);

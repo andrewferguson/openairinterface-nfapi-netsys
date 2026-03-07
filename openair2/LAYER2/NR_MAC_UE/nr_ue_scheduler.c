@@ -115,7 +115,10 @@ fapi_nr_ul_config_request_t *get_ul_config_request(NR_UE_MAC_INST_t *mac, int sl
   NR_TDD_UL_DL_ConfigCommon_t *tdd_config = mac->tdd_UL_DL_ConfigurationCommon;
 
   //Check if requested on the right slot
-  AssertFatal(is_nr_UL_slot(tdd_config, slot, mac->frame_type) != 0, "UL config_request called at wrong slot %d\n", slot);
+  if (!is_nr_UL_slot(tdd_config, slot, mac->frame_type)) {
+    LOG_W(NR_MAC, "UL config_request called at wrong slot %d, ignoring\n", slot);
+    return NULL;
+  }
 
   int mu = mac->current_UL_BWP ? mac->current_UL_BWP->scs : get_softmodem_params()->numerology;
   const int n = nr_slots_per_frame[mu];

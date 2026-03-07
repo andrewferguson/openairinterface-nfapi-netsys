@@ -1218,6 +1218,7 @@ void *nas_nrue(void *args_p)
             LOG_I(NAS, "received deregistration accept\n");
             break;
           case FGS_PDU_SESSION_ESTABLISHMENT_ACC: {
+            capture_pdu_session_establishment_accept_msg(pdu_buffer, NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length);
             uint8_t offset = 0;
             uint8_t *payload_container = pdu_buffer;
             offset += SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
@@ -1225,7 +1226,7 @@ void *nas_nrue(void *args_p)
             if ((payload_container_length >= PAYLOAD_CONTAINER_LENGTH_MIN)
                 && (payload_container_length <= PAYLOAD_CONTAINER_LENGTH_MAX))
               offset += (PLAIN_5GS_NAS_MESSAGE_HEADER_LENGTH + 3);
-            if (offset < NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length)
+            if (offset < NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length)
               payload_container = pdu_buffer + offset;
 
             while (offset < payload_container_length) {

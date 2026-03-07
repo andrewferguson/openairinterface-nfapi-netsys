@@ -42,7 +42,7 @@ static int ue_stat_dci_cnt = 0;         /* DCI received for DL (set_harq_status 
 static long long ue_stat_total_tbs = 0; /* sum of TBS from set_harq_status */
 static int ue_stat_ack_real = 0;        /* HARQ ACKs sent (ack_received=true, ack=1) */
 static int ue_stat_nack_real = 0;       /* HARQ NACKs sent (ack_received=true, ack=0) */
-static int ue_stat_ack_assumed = 0;     /* ACKs assumed in emulate_l1 (ack_received=false) */
+static int ue_stat_fb_missing = 0;      /* HARQ feedback occasions where decode result was not ready */
 int ue_stat_decode_cnt = 0;             /* decode completions (update_harq_status calls) — extern in NR_IF_Module.c */
 static int ue_stat_last_report = -1;    /* last reported frame (to avoid double-print) */
 
@@ -1293,6 +1293,8 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
 {
   NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_id];
   current_harq->active = true;
+  /* Always wait for decode result from update_harq_status().
+   * Pre-ACKing at DCI time can acknowledge data that never reached UE MAC. */
   current_harq->ack_received = false;
   current_harq->pucch_resource_indicator = pucch_id;
   current_harq->dai = dai;
@@ -1333,11 +1335,9 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
   LOG_D(NR_PHY,"Setting harq_status for harq_id %d, dl %d.%d, sched ul %d.%d fb time %d\n",
         harq_id, frame, slot, current_harq->ul_frame, current_harq->ul_slot, data_toul_fb);
   /* diagnostic counters */
-  // ue_stat_dci_cnt++;
-  // ue_stat_total_tbs += current_harq->TBS;
-  // printf("[UE-DCI] %4d.%2d pid=%d K1=%d ack@%4d.%2d TBS=%d\n",
-  //        frame, slot, harq_id, data_toul_fb,
-  //        current_harq->ul_frame, current_harq->ul_slot, current_harq->TBS);
+  ue_stat_dci_cnt++;
+  ue_stat_total_tbs += current_harq->TBS;
+  // High-rate DCI tracing disabled for throughput runs.
 }
 
 void nr_ue_configure_pucch(NR_UE_MAC_INST_t *mac,
@@ -2310,22 +2310,18 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
                 ack_data[code_word][dai_current - 1] = current_harq->ack;
                 current_harq->active = false;
                 current_harq->ack_received = false;
-                // if (current_harq->ack) ue_stat_ack_real++;
-                // else ue_stat_nack_real++;
-                // printf("[UE-ACK] %4d.%2d pid=%d REAL ack=%d\n",
-                //        frame, slot, dl_harq_pid, current_harq->ack);
+                if (current_harq->ack) ue_stat_ack_real++;
+                else ue_stat_nack_real++;
+                // High-rate ACK tracing disabled for throughput runs.
               } else if (get_softmodem_params()->emulate_l1) {
-                /* In L1 emulation mode, DLSCH decoding always succeeds.
-                   If ack_received is not yet set, it is due to message
-                   processing ordering, not a real decoding failure.
-                   Treat as ACK to avoid spurious NACKs and retransmissions. */
-                LOG_D(NR_MAC, "DLSCH ACK/NACK reporting for harq pid %d before DLSCH decoding completed (emulation mode: assuming ACK)\n", dl_harq_pid);
+                /* Emulated-L1 decode indication may arrive after PUCCH timing.
+                 * Use ACK fallback to avoid artificial HARQ retransmission storms. */
                 ack_data[code_word][dai_current - 1] = 1;
+                current_harq->ack = 1;
                 current_harq->active = false;
                 current_harq->ack_received = false;
-                // ue_stat_ack_assumed++;
-                // printf("[UE-ACK] %4d.%2d pid=%d ASSUMED-ACK (ack_received not set)\n",
-                //        frame, slot, dl_harq_pid);
+                ue_stat_fb_missing++;
+                // High-rate ACK tracing disabled for throughput runs.
               } else {
                 LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed for now marking as compelete \n", dl_harq_pid);
                 ack_data[code_word][dai_current - 1] = 0;
@@ -2450,19 +2446,19 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
   pucch->n_harq = number_harq_feedback;
 
   /* per-second summary report */
-  // if (frame % 100 == 0 && frame != ue_stat_last_report) {
-  //   ue_stat_last_report = frame;
-  //   printf("[UE-STAT] frame=%d dci_cnt=%d total_tbs=%lld ack_real=%d nack_real=%d ack_assumed=%d decode_cnt=%d\n",
-  //          frame, ue_stat_dci_cnt, ue_stat_total_tbs,
-  //          ue_stat_ack_real, ue_stat_nack_real, ue_stat_ack_assumed,
-  //          ue_stat_decode_cnt);
-  //   ue_stat_dci_cnt = 0;
-  //   ue_stat_total_tbs = 0;
-  //   ue_stat_ack_real = 0;
-  //   ue_stat_nack_real = 0;
-  //   ue_stat_ack_assumed = 0;
-  //   ue_stat_decode_cnt = 0;
-  // }
+  if (frame % 100 == 0 && frame != ue_stat_last_report) {
+    ue_stat_last_report = frame;
+    printf("[UE-STAT] frame=%d dci_cnt=%d total_tbs=%lld ack_real=%d nack_real=%d fb_missing=%d decode_cnt=%d\n",
+           frame, ue_stat_dci_cnt, ue_stat_total_tbs,
+           ue_stat_ack_real, ue_stat_nack_real, ue_stat_fb_missing,
+           ue_stat_decode_cnt);
+    ue_stat_dci_cnt = 0;
+    ue_stat_total_tbs = 0;
+    ue_stat_ack_real = 0;
+    ue_stat_nack_real = 0;
+    ue_stat_fb_missing = 0;
+    ue_stat_decode_cnt = 0;
+  }
 
   return (number_harq_feedback > 0);
 }
