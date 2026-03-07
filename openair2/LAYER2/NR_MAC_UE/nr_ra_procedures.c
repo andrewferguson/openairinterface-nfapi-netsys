@@ -39,6 +39,7 @@
 #include "LAYER2/NR_MAC_UE/mac_proto.h"
 
 #include <executables/softmodem-common.h>
+#include <stdio.h>
 
 int16_t get_prach_tx_power(module_id_t mod_id) {
 
@@ -910,6 +911,23 @@ void nr_ra_succeeded(const module_id_t mod_id, const uint8_t gNB_index, const fr
   nr_mac_rrc_ra_ind(mod_id, frame, true);
 }
 
+static void nr_ra_reset_context_for_retry(NR_UE_MAC_INST_t *mac)
+{
+  RA_config_t *ra = &mac->ra;
+  ra->RA_active = 0;
+  ra->RA_window_cnt = -1;
+  ra->RA_contention_resolution_timer_active = 0;
+  ra->RA_RAPID_found = 0;
+  ra->RA_BI_found = 0;
+  ra->RA_backoff_indicator = 0;
+  ra->RA_backoff_cnt = 0;
+  ra->ra_rnti = 0;
+  ra->t_crnti = 0;
+  memset(ra->cont_res_id, 0, sizeof(ra->cont_res_id));
+  if (mac->state != UE_CONNECTED)
+    mac->crnti = 0;
+}
+
 // Handling failure of RA procedure @ MAC layer
 // according to section 5 of 3GPP TS 38.321 version 16.2.1 Release 16
 // todo:
@@ -928,12 +946,18 @@ void nr_ra_failed(uint8_t mod_id, uint8_t CC_id, NR_PRACH_RESOURCES_t *prach_res
     // & to truncate the int64_t and keep only the LSB bits, up to sizeof(int)
     seed = (unsigned int) (rdtsc_oai() & ~0);
   }
-  
+
+  nr_ra_reset_context_for_retry(mac);
   ra->first_Msg3 = 1;
   ra->ra_PreambleIndex = -1;
   ra->ra_state = RA_UE_IDLE;
 
   prach_resources->RA_PREAMBLE_TRANSMISSION_COUNTER++;
+  printf("[UE-RA-RETRY] %d.%d reset RA context, fresh RACH preamble counter=%d\n",
+         frame,
+         slot,
+         prach_resources->RA_PREAMBLE_TRANSMISSION_COUNTER);
+  fflush(stdout);
 
   if (prach_resources->RA_PREAMBLE_TRANSMISSION_COUNTER == ra->preambleTransMax + 1){
 

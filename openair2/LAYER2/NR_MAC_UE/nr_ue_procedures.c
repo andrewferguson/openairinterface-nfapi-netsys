@@ -1293,14 +1293,9 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
 {
   NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_id];
   current_harq->active = true;
-  if (get_softmodem_params()->emulate_l1) {
-    /* In emulated L1, decode indication can arrive after scheduled PUCCH slot.
-     * Pre-mark ACK to avoid feedback races for short K1 timings. */
-    current_harq->ack_received = true;
-    current_harq->ack = 1;
-  } else {
-    current_harq->ack_received = false;
-  }
+  /* Wait for decode result from update_harq_status().
+   * Pre-ACKing at DCI time can acknowledge Msg4/data not received by UE MAC. */
+  current_harq->ack_received = false;
   current_harq->pucch_resource_indicator = pucch_id;
   current_harq->dai = dai;
   current_harq->j_dai = 0;
