@@ -71,6 +71,14 @@ static const uint8_t DELTA[4] = {2, 3, 4, 6};
 static const float ssb_per_rach_occasion[8] = {0.125, 0.25, 0.5, 1, 2, 4, 8};
 static const int MSG4_ACK_TIMEOUT_MS = 100;
 static const int MSG4_ACK_TIMEOUT_RETRIES_EMUL = 1;
+// backstop for RA processes stuck in a non-IDLE state (e.g. WAIT_Msg3 when
+// Msg3 is lost): reclaim after this many scheduler slots (2000 slots = 1s @ 30kHz)
+// was 2000 (1s @ 30kHz): far longer than the UE's own RA retry cadence
+// (preambleTransMax retries happen within tens of ms), so zombie RA
+// processes lingered long enough to starve the NR_NB_RA_PROC_MAX pool
+// under concurrent RACH load. Lowered to reclaim stuck processes fast
+// enough to keep pace with UE-side retries.
+static const int RA_STUCK_TIMEOUT_SLOTS = 1000;
 
 static bool nr_list_contains(const NR_list_t *listP, int id)
 {
@@ -651,6 +659,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     }
     LOG_D(NR_MAC, "Frame %d, Slot %d: Activating RA process \n", frameP, slotP);
     ra->state = Msg2;
+    ra->stuck_timer = 0;
     ra->timing_offset = timing_offset;
     ra->preamble_slot = slotP;
 
@@ -1992,6 +2001,7 @@ void nr_clear_ra_proc(module_id_t module_idP, int CC_id, frame_t frameP, NR_RA_t
   ra->RRC_timer = 20;
   ra->msg3_round = 0;
   ra->msg4_ack_timeout_count = 0;
+  ra->stuck_timer = 0;
   if(ra->cfra == false) {
     ra->rnti = 0;
   }
@@ -2136,11 +2146,33 @@ void nr_schedule_RA(module_id_t module_idP,
   NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
 
   start_meas(&mac->schedule_ra);
+  // NOTE: tried rotating the scan start index here for CCE/PRB fairness
+  // across RA processes; reverted -- nr_generate_Msg2() only ever fires in
+  // one precomputed, one-shot slot (gated by ra->Msg2_frame/Msg2_slot) with
+  // no retry, so deprioritizing it via rotation causes permanent Msg2
+  // starvation instead of the intended fairness, which measured worse
+  // overall than the fixed scan order.
   for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
     NR_COMMON_channels_t *cc = &mac->common_channels[CC_id];
     for (int i = 0; i < NR_NB_RA_PROC_MAX; i++) {
       NR_RA_t *ra = &cc->ra[i];
       LOG_D(NR_MAC, "RA[state:%d]\n", ra->state);
+      if (ra->state != RA_IDLE && ++ra->stuck_timer > RA_STUCK_TIMEOUT_SLOTS) {
+        printf("[RA-RECOVERY] %4d.%2d reclaiming RA process %d stuck in state %d for rnti %04x\n",
+               frameP,
+               slotP,
+               i,
+               ra->state,
+               ra->rnti);
+        fflush(stdout);
+        if (ra->state == Msg4 || ra->state == WAIT_Msg4_ACK) {
+          NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, ra->rnti);
+          if (UE && !UE->Msg4_ACKed)
+            mac_remove_nr_ue(mac, ra->rnti);
+        }
+        nr_clear_ra_proc(module_idP, CC_id, frameP, ra);
+        continue;
+      }
       switch (ra->state) {
         case Msg2:
           nr_generate_Msg2(module_idP, CC_id, frameP, slotP, ra, DL_req, TX_req);

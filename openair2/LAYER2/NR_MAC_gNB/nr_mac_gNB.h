@@ -208,6 +208,9 @@ typedef struct {
   uint8_t msg3_round;
   /// Number of Msg4 ACK timeout-based retries done for this RA process
   uint8_t msg4_ack_timeout_count;
+  /// Slots spent in a non-IDLE state; backstop to reclaim RA processes stuck
+  /// in Msg2/WAIT_Msg3 when Msg3 never arrives (no timeout exists for those states)
+  int stuck_timer;
   int msg3_startsymb;
   int msg3_nrsymb;
   /// TBS used for Msg4
@@ -648,6 +651,16 @@ typedef struct {
 
   // Information about the QoS configuration for each LCID/DRB
   NR_QoS_config_t qos_config[NR_MAX_NUM_LCID - 4][NR_MAX_NUM_QFI]; // 0 -CCCH and 1- 3 SRBs(0,1,2)
+
+  /// True from UE creation (post Msg4) until this UE's first regular UL
+  /// grant (its very first uplink transmission after RRC Setup, typically
+  /// RRCSetupComplete, has no known buffered data yet so can only be
+  /// scheduled via the SR/inactivity "B==0" path in pf_ul()). Used to give
+  /// attach-in-progress UEs priority over established UEs' routine
+  /// SR/inactivity grants for the small shared per-slot scheduling quota,
+  /// so a newly-connected UE isn't starved indefinitely once enough
+  /// already-connected UEs keep that quota full every slot.
+  bool initial_ul_grant_pending;
 } NR_UE_sched_ctrl_t;
 
 typedef struct {

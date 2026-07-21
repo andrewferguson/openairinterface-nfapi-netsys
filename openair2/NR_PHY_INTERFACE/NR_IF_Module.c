@@ -278,28 +278,6 @@ static void free_unqueued_nfapi_indications(nfapi_nr_rach_indication_t *rach_ind
   }
 }
 
-static void remove_crc_pdu(nfapi_nr_crc_indication_t *crc_ind, int index) {
-  AssertFatal(index >= 0, "Invalid index %d\n", index);
-  AssertFatal(index < crc_ind->number_crcs, "Invalid index %d\n", index);
-  AssertFatal(crc_ind->number_crcs > 0, "Invalid crc_ind->number_crcs %d\n", crc_ind->number_crcs);
-
-  memmove(crc_ind->crc_list + index,
-          crc_ind->crc_list + index + 1,
-          sizeof(*crc_ind->crc_list) * (crc_ind->number_crcs - index - 1));
-  crc_ind->number_crcs--;
-}
-
-static void remove_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, int index) {
-  AssertFatal(index >= 0, "Invalid index %d\n", index);
-  AssertFatal(index < rx_ind->number_of_pdus, "Invalid index %d\n", index);
-  AssertFatal(rx_ind->number_of_pdus > 0, "Invalid rx_ind->number_of_pdus %d\n", rx_ind->number_of_pdus);
-
-  memmove(rx_ind->pdu_list + index,
-          rx_ind->pdu_list + index + 1,
-          sizeof(*rx_ind->pdu_list) * (rx_ind->number_of_pdus - index - 1));
-  rx_ind->number_of_pdus--;
-}
-
 static bool crc_ind_has_rnti(nfapi_nr_crc_indication_t *crc_ind, uint16_t rnti) {
   for (int i = 0; i < crc_ind->number_crcs; i++) {
     if (rnti == crc_ind->crc_list[i].rnti) {
@@ -318,32 +296,46 @@ static bool rx_ind_has_rnti(nfapi_nr_rx_data_indication_t *rx_ind, uint16_t rnti
   return false;
 }
 
+// Partitions crc_ind's entries in a single forward pass into "matched"
+// (has a corresponding rnti in rx_ind) and "unmatched", writing matched
+// entries back into crc_ind (compacted) and returning the unmatched ones
+// via *crc_ind_unmatched. This was previously done via in-place
+// memmove-based removal (remove_crc_pdu()) while iterating forward over
+// the SAME shrinking array -- after removing index i, the element shifted
+// into position i was skipped because the loop still advanced to i+1,
+// which could leave crc_ind->number_crcs inconsistent with the actual
+// count of unmatched entries collected, tripping the AssertFatal below
+// and crashing the whole gNB process. A single non-mutating partition
+// pass has no such hazard.
 static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc_indication_t *crc_ind) {
   AssertFatal(crc_ind->number_crcs > 0 &&  rx_ind->number_of_pdus > 0,
               "Invalid number of crc_ind->number_crcs %d or rx_ind->number_of_pdus %d\n",
               crc_ind->number_crcs, rx_ind->number_of_pdus);
   if (crc_ind->number_crcs > rx_ind->number_of_pdus) {
-    int num_unmatched_crcs = 0;
+    const int orig_count = crc_ind->number_crcs;
+    nfapi_nr_crc_t *matched = calloc(orig_count, sizeof(nfapi_nr_crc_t));
     nfapi_nr_crc_indication_t *crc_ind_unmatched = calloc(1, sizeof(*crc_ind_unmatched));
     crc_ind_unmatched->header = crc_ind->header;
     crc_ind_unmatched->sfn = crc_ind->sfn;
     crc_ind_unmatched->slot = crc_ind->slot;
-    crc_ind_unmatched->number_crcs = crc_ind->number_crcs - rx_ind->number_of_pdus;
-    crc_ind_unmatched->crc_list = calloc(crc_ind_unmatched->number_crcs, sizeof(nfapi_nr_crc_t));
-    for (int i = 0; i < crc_ind->number_crcs; i++) {
-      if (!rx_ind_has_rnti(rx_ind, crc_ind->crc_list[i].rnti)) {
-          LOG_I(NR_MAC, "crc_ind->crc_list[%d].rnti %x does not match any rx_ind pdu rnti\n",
-                i, crc_ind->crc_list[i].rnti);
-          crc_ind_unmatched->crc_list[num_unmatched_crcs] = crc_ind->crc_list[i];
-          num_unmatched_crcs++;
-          remove_crc_pdu(crc_ind, i);
-      }
-      if (crc_ind->number_crcs == rx_ind->number_of_pdus) {
-        break;
+    crc_ind_unmatched->crc_list = calloc(orig_count, sizeof(nfapi_nr_crc_t));
+
+    int num_matched = 0;
+    int num_unmatched = 0;
+    for (int i = 0; i < orig_count; i++) {
+      if (rx_ind_has_rnti(rx_ind, crc_ind->crc_list[i].rnti)) {
+        matched[num_matched++] = crc_ind->crc_list[i];
+      } else {
+        LOG_I(NR_MAC, "crc_ind->crc_list[%d].rnti %x does not match any rx_ind pdu rnti\n",
+              i, crc_ind->crc_list[i].rnti);
+        crc_ind_unmatched->crc_list[num_unmatched++] = crc_ind->crc_list[i];
       }
     }
-    AssertFatal(crc_ind_unmatched->number_crcs == num_unmatched_crcs, "crc_ind num_pdus %d doesnt match %d\n",
-                crc_ind_unmatched->number_crcs, num_unmatched_crcs);
+    memcpy(crc_ind->crc_list, matched, sizeof(nfapi_nr_crc_t) * num_matched);
+    crc_ind->number_crcs = num_matched;
+    crc_ind_unmatched->number_crcs = num_unmatched;
+    free(matched);
+
     if (!requeue(&gnb_crc_ind_queue, crc_ind_unmatched))
     {
       LOG_E(NR_PHY, "requeue failed for crc_ind_unmatched.\n");
@@ -352,27 +344,30 @@ static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc
     }
   }
   else if (crc_ind->number_crcs < rx_ind->number_of_pdus) {
-    int num_unmatched_rxs = 0;
+    const int orig_count = rx_ind->number_of_pdus;
+    nfapi_nr_rx_data_pdu_t *matched = calloc(orig_count, sizeof(nfapi_nr_rx_data_pdu_t));
     nfapi_nr_rx_data_indication_t *rx_ind_unmatched = calloc(1, sizeof(*rx_ind_unmatched));
     rx_ind_unmatched->header = rx_ind->header;
     rx_ind_unmatched->sfn = rx_ind->sfn;
     rx_ind_unmatched->slot = rx_ind->slot;
-    rx_ind_unmatched->number_of_pdus = rx_ind->number_of_pdus - crc_ind->number_crcs;
-    rx_ind_unmatched->pdu_list = calloc(rx_ind_unmatched->number_of_pdus, sizeof(nfapi_nr_pdu_t));
-    for (int i = 0; i < rx_ind->number_of_pdus; i++) {
-      if (!crc_ind_has_rnti(crc_ind, rx_ind->pdu_list[i].rnti)) {
+    rx_ind_unmatched->pdu_list = calloc(orig_count, sizeof(nfapi_nr_rx_data_pdu_t));
+
+    int num_matched = 0;
+    int num_unmatched = 0;
+    for (int i = 0; i < orig_count; i++) {
+      if (crc_ind_has_rnti(crc_ind, rx_ind->pdu_list[i].rnti)) {
+        matched[num_matched++] = rx_ind->pdu_list[i];
+      } else {
         LOG_I(NR_MAC, "rx_ind->pdu_list[%d].rnti %d does not match any crc_ind pdu rnti\n",
               i, rx_ind->pdu_list[i].rnti);
-        rx_ind_unmatched->pdu_list[num_unmatched_rxs] = rx_ind->pdu_list[i];
-        num_unmatched_rxs++;
-        remove_rx_pdu(rx_ind, i);
-      }
-      if (rx_ind->number_of_pdus == crc_ind->number_crcs) {
-        break;
+        rx_ind_unmatched->pdu_list[num_unmatched++] = rx_ind->pdu_list[i];
       }
     }
-    AssertFatal(rx_ind_unmatched->number_of_pdus == num_unmatched_rxs, "rx_ind num_pdus %d doesnt match %d\n",
-                rx_ind_unmatched->number_of_pdus, num_unmatched_rxs);
+    memcpy(rx_ind->pdu_list, matched, sizeof(nfapi_nr_rx_data_pdu_t) * num_matched);
+    rx_ind->number_of_pdus = num_matched;
+    rx_ind_unmatched->number_of_pdus = num_unmatched;
+    free(matched);
+
     if (!requeue(&gnb_rx_ind_queue, rx_ind_unmatched))
     {
       LOG_E(NR_PHY, "requeue failed for rx_ind_unmatched.\n");
@@ -457,6 +452,11 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
                                  crc_sfn_slot_matcher,
                                  &sfn_slot);
       if (!crc_ind) {
+        printf("[UL-MATCH-TRACE] %u.%u NO crc_ind match for rx_ind (rx pdus=%d rnti[0]=%04x); requeuing. rx_q=%zu crc_q=%zu\n",
+               rx_ind->sfn, rx_ind->slot, rx_ind->number_of_pdus,
+               rx_ind->number_of_pdus > 0 ? rx_ind->pdu_list[0].rnti : 0,
+               gnb_rx_ind_queue.num_items, gnb_crc_ind_queue.num_items);
+        fflush(stdout);
         LOG_I(NR_PHY, "No crc indication with the same SFN SLOT of rx indication %u %u\n", rx_ind->sfn, rx_ind->slot);
         requeue(&gnb_rx_ind_queue, rx_ind);
       }
@@ -465,8 +465,41 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
         AssertFatal(crc_ind->number_crcs > 0, "Invalid number of PDUs\n");
         if (crc_ind->number_crcs != rx_ind->number_of_pdus)
           match_crc_rx_pdu(rx_ind, crc_ind);
-        UL_info->rx_ind = *rx_ind;
-        UL_info->crc_ind = *crc_ind;
+
+        // crc_ind and rx_ind are populated independently/asynchronously per
+        // UE (each UE's emulated PHY stub sends its own crc_ind/rx_ind), so
+        // even after match_crc_rx_pdu() guarantees equal counts, entry i in
+        // crc_ind->crc_list is not guaranteed to be the same UE as entry i
+        // in rx_ind->pdu_list -- handle_nr_ulsch() assumes index-aligned
+        // pairing and AssertFatal()s (crashing the whole gNB) on a mismatch.
+        // Reorder crc_ind->crc_list in place to match rx_ind's rnti order.
+        for (int __i = 0; __i < rx_ind->number_of_pdus; __i++) {
+          if (crc_ind->crc_list[__i].rnti == rx_ind->pdu_list[__i].rnti)
+            continue;
+          int __j;
+          for (__j = __i + 1; __j < crc_ind->number_crcs; __j++) {
+            if (crc_ind->crc_list[__j].rnti == rx_ind->pdu_list[__i].rnti)
+              break;
+          }
+          if (__j < crc_ind->number_crcs) {
+            const nfapi_nr_crc_t __tmp = crc_ind->crc_list[__i];
+            crc_ind->crc_list[__i] = crc_ind->crc_list[__j];
+            crc_ind->crc_list[__j] = __tmp;
+          } else {
+            printf("[UL-MATCH-TRACE] %u.%u no crc_ind entry for rx_ind rnti %04x after matching -- dropping this slot's UL indication\n",
+                   rx_ind->sfn, rx_ind->slot, rx_ind->pdu_list[__i].rnti);
+            fflush(stdout);
+            requeue(&gnb_rx_ind_queue, rx_ind);
+            requeue(&gnb_crc_ind_queue, crc_ind);
+            rx_ind = NULL;
+            crc_ind = NULL;
+            break;
+          }
+        }
+        if (rx_ind && crc_ind) {
+          UL_info->rx_ind = *rx_ind;
+          UL_info->crc_ind = *crc_ind;
+        }
       }
     }
   }

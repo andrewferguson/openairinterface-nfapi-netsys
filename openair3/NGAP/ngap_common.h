@@ -116,7 +116,11 @@ extern int asn1_xer_print;
     }                                                                                                                                   \
     if (ie == NULL) {                                                                                                                   \
       if (mandatory) {                                                                                                                  \
-        AssertFatal(NGAP, "NGAP_FIND_PROTOCOLIE_BY_ID ie is NULL (searching for ie: %ld)\n", IE_ID);                                    \
+        /* was AssertFatal(NGAP, ...): NGAP is a non-zero log-component enum,                                                           \
+         * not a boolean on ie, so this never fired -- mandatory-IE-missing                                                             \
+         * failures were completely silent (message dropped via the         \
+         * `return -1` below with zero log output). */                                                                                  \
+        NGAP_ERROR("NGAP_FIND_PROTOCOLIE_BY_ID: mandatory IE missing (searching for ie: %ld), dropping message in %s\n", IE_ID, __func__); \
       } else {                                                                                                                          \
         NGAP_INFO("NGAP_FIND_PROTOCOLIE_BY_ID ie is NULL (searching for ie: %ld)\n", IE_ID);                                            \
       }                                                                                                                                 \

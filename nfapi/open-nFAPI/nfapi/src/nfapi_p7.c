@@ -4511,6 +4511,7 @@ static uint8_t unpack_dl_config_ndlsch_pdu_rel13_value(void *tlv, uint8_t **ppRe
 
 static uint8_t unpack_dl_tti_request_body_value(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg) {
   nfapi_nr_dl_tti_request_pdu_t *value = (nfapi_nr_dl_tti_request_pdu_t *)msg;
+  uint8_t *pduStart = *ppReadPackedMsg;
 
   if(!(pull16(ppReadPackedMsg, &value->PDUType, end) &&
        pull16(ppReadPackedMsg, (uint16_t *) &value->PDUSize, end)))
@@ -4547,6 +4548,12 @@ static uint8_t unpack_dl_tti_request_body_value(uint8_t **ppReadPackedMsg, uint8
     }
     break;
   }
+
+  /* Same cursor snap as unpack_ul_tti_pdu_list_value: PDUSize spans from the
+     PDU header start, so realign to protect following PDUs from any
+     pack/unpack field asymmetry in the routine that just ran. */
+  if (value->PDUSize >= 4 && pduStart + value->PDUSize <= end)
+    *ppReadPackedMsg = pduStart + value->PDUSize;
 
   return 1;
 }
@@ -4825,10 +4832,11 @@ static uint8_t unpack_ul_tti_request_pusch_pdu(void *tlv, uint8_t **ppReadPacked
         && pull8(ppReadPackedMsg, &pusch_pdu->mcs_table, end) && pull8(ppReadPackedMsg, &pusch_pdu->transform_precoding, end)
         && pull16(ppReadPackedMsg, &pusch_pdu->data_scrambling_id, end) && pull8(ppReadPackedMsg, &pusch_pdu->nrOfLayers, end)
         && pull16(ppReadPackedMsg, &pusch_pdu->ul_dmrs_symb_pos, end) && pull8(ppReadPackedMsg, &pusch_pdu->dmrs_config_type, end)
-        && pull16(ppReadPackedMsg, &pusch_pdu->ul_dmrs_scrambling_id, end) && pull8(ppReadPackedMsg, &pusch_pdu->scid, end)
+        && pull16(ppReadPackedMsg, &pusch_pdu->ul_dmrs_scrambling_id, end)
+        && pull16(ppReadPackedMsg, &pusch_pdu->pusch_identity, end) && pull8(ppReadPackedMsg, &pusch_pdu->scid, end)
         && pull8(ppReadPackedMsg, &pusch_pdu->num_dmrs_cdm_grps_no_data, end)
         && pull16(ppReadPackedMsg, &pusch_pdu->dmrs_ports, end) && pull8(ppReadPackedMsg, &pusch_pdu->resource_alloc, end)
-        && pull8(ppReadPackedMsg, &pusch_pdu->resource_alloc, end) && pull16(ppReadPackedMsg, &pusch_pdu->dmrs_ports, end)
+        && pullarray8(ppReadPackedMsg, pusch_pdu->rb_bitmap, 36, 36, end)
         && pull16(ppReadPackedMsg, &pusch_pdu->rb_start, end) && pull16(ppReadPackedMsg, &pusch_pdu->rb_size, end)
         && pull8(ppReadPackedMsg, &pusch_pdu->vrb_to_prb_mapping, end) && pull8(ppReadPackedMsg, &pusch_pdu->frequency_hopping, end)
         && pull16(ppReadPackedMsg, &pusch_pdu->tx_direct_current_location, end)
@@ -4844,9 +4852,12 @@ static uint8_t unpack_ul_tti_request_pusch_pdu(void *tlv, uint8_t **ppReadPacked
       // pack optional TLVs
       if (!(pull8(ppReadPackedMsg, &pusch_pdu->pusch_data.rv_index, end)
             && pull8(ppReadPackedMsg, &pusch_pdu->pusch_data.harq_process_id, end)
+            && pull8(ppReadPackedMsg, &pusch_pdu->pusch_data.new_data_indicator, end)
             && pull32(ppReadPackedMsg, &pusch_pdu->pusch_data.tb_size, end)
             && pull16(ppReadPackedMsg, &pusch_pdu->pusch_data.num_cb, end)
-            && pullarray8(ppReadPackedMsg, pusch_pdu->pusch_data.cb_present_and_position, 1, 1, end))) {
+            && pullarray8(ppReadPackedMsg, pusch_pdu->pusch_data.cb_present_and_position,
+                          (pusch_pdu->pusch_data.num_cb + 7) / 8,
+                          (pusch_pdu->pusch_data.num_cb + 7) / 8, end))) {
         return 0;
       }
     } break;
@@ -4930,6 +4941,7 @@ static uint8_t unpack_ul_tti_request_srs_pdu(void *tlv, uint8_t **ppReadPackedMs
 
 static uint8_t unpack_ul_tti_pdu_list_value(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg) {
   nfapi_nr_ul_tti_request_number_of_pdus_t *pNfapiMsg = (nfapi_nr_ul_tti_request_number_of_pdus_t *)msg;
+  uint8_t *pduStart = *ppReadPackedMsg;
 
   if(!(pull16(ppReadPackedMsg, &pNfapiMsg->pdu_type, end) &&
        pull16(ppReadPackedMsg, &pNfapiMsg->pdu_size, end) ))
@@ -4967,6 +4979,14 @@ static uint8_t unpack_ul_tti_pdu_list_value(uint8_t **ppReadPackedMsg, uint8_t *
     break;
   }
 
+  /* pdu_size is measured on the pack side from the start of this PDU's
+     header, so the next PDU begins exactly pdu_size bytes after pduStart.
+     Snap the cursor there: any field-level asymmetry between the per-PDU
+     pack and unpack routines otherwise leaves the cursor misaligned and
+     corrupts every following PDU in the message (multi-UE UL_TTI blocker). */
+  if (pNfapiMsg->pdu_size >= 4 && pduStart + pNfapiMsg->pdu_size <= end)
+    *ppReadPackedMsg = pduStart + pNfapiMsg->pdu_size;
+
   return 1;
 }
 
@@ -4997,9 +5017,9 @@ static uint8_t unpack_ul_tti_request(uint8_t **ppReadPackedMsg, uint8_t *end, vo
     return 0;
   if (!pull8(ppReadPackedMsg, &pNfapiMsg->rach_present, end))
     return 0;
-  if (!pull8(ppReadPackedMsg, &pNfapiMsg->n_ulcch, end))
-    return 0;
   if (!pull8(ppReadPackedMsg, &pNfapiMsg->n_ulsch, end))
+    return 0;
+  if (!pull8(ppReadPackedMsg, &pNfapiMsg->n_ulcch, end))
     return 0;
   if (!pull8(ppReadPackedMsg, &pNfapiMsg->n_group, end))
     return 0;

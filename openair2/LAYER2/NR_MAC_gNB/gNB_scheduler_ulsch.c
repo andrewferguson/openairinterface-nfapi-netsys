@@ -611,6 +611,11 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
         T_INT(rntiP), T_INT(frameP), T_INT(slotP), T_INT(harq_pid),
         T_BUFFER(sduP, sdu_lenP));
 
+    if (UE->mac_stats.ul.total_bytes < 1000) {
+      printf("[UL-ATTACH-TRACE] %4d.%2d UE %04x: _nr_rx_sdu (established branch) harq_pid=%d sduP=%s sdu_lenP=%d total_prior=%"PRIu64" ul_cqi=%d rssi=%d\n",
+             frameP, slotP, current_rnti, harq_pid, sduP ? "non-NULL(CRC-ok)" : "NULL(CRC-fail/DTX)", sdu_lenP, UE->mac_stats.ul.total_bytes, ul_cqi, rssi);
+      fflush(stdout);
+    }
     UE->mac_stats.ul.total_bytes += sdu_lenP;
     LOG_D(NR_MAC, "[gNB %d][PUSCH %d] CC_id %d %d.%d Received ULSCH sdu from PHY (rnti %04x) ul_cqi %d TA %d sduP %p, rssi %d\n",
           gnb_mod_idP,
@@ -707,26 +712,24 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
       NR_RA_t *ra = &gNB_mac->common_channels[CC_idP].ra[i];
       if (ra->state != WAIT_Msg3)
         continue;
-      
+
+      // This report (no_sig or otherwise) pertains to exactly one TC-RNTI
+      // (current_rnti). Multiple concurrent RA processes legitimately share
+      // the same Msg3 frame/slot (differing only in PRB allocation, which
+      // this function cannot see), so a no-signal or RNTI-mismatch report
+      // must never be used to fail an RA process other than the one that
+      // was actually allocated current_rnti -- doing so was killing
+      // unrelated, still-valid RA processes under concurrent RACH load, with
+      // more collateral damage as UE count/RA concurrency increased. Genuine
+      // failures/timeouts of the OTHER processes are caught separately by
+      // the stuck_timer reclaim in nr_schedule_RA().
+      if (ra->rnti != current_rnti)
+        continue;
+
       if(no_sig) {
         LOG_D(NR_MAC, "Random Access %i failed at state %i (no signal)\n", i, ra->state);
         nr_clear_ra_proc(gnb_mod_idP, CC_idP, frameP, ra);
       } else {
-
-        // random access pusch with TC-RNTI
-        if (ra->rnti != current_rnti) {
-          LOG_D(NR_MAC,
-                "expected TC_RNTI %04x to match current RNTI %04x\n",
-                ra->rnti,
-                current_rnti);
-
-          if( (frameP==ra->Msg3_frame) && (slotP==ra->Msg3_slot) ) {
-            LOG_D(NR_MAC, "Random Access %i failed at state %i (TC_RNTI %04x RNTI %04x)\n", i, ra->state,ra->rnti,current_rnti);
-            nr_clear_ra_proc(gnb_mod_idP, CC_idP, frameP, ra);
-          }
-
-          continue;
-        }
 
         NR_UE_info_t *UE_msg3_stage = UE ? UE : add_new_nr_ue(gNB_mac, ra->rnti, ra->CellGroup);
         if (!UE_msg3_stage) {
@@ -1625,7 +1628,11 @@ typedef struct UEsched_s {
 } UEsched_t;
 
 static int comparator(const void *p, const void *q) {
-  return ((UEsched_t*)p)->coef < ((UEsched_t*)q)->coef;
+  // was `return a < b`, which only ever yields 0 or 1 -- never negative --
+  // not a valid strict-weak-ordering for qsort even between two real entries.
+  const float a = ((UEsched_t*)p)->coef;
+  const float b = ((UEsched_t*)q)->coef;
+  return (a < b) - (a > b);
 }
 
 static void pf_ul(module_id_t module_id,
@@ -1664,8 +1671,42 @@ static void pf_ul(module_id_t module_id,
   int remainUEs = max_num_ue;
   int curUE=0;
 
-  /* Loop UE_list to calculate throughput and coeff */
-  UE_iterator(UE_list, UE) {
+  /* remainUEs is a small fixed per-slot quota (derived from carrier
+   * bandwidth); UEs earlier in UE_list that consume it via retransmissions
+   * or SR-or-inactivity grants make later UEs skip this slot entirely
+   * (`if (remainUEs == 0) continue;` below) without even attempting
+   * get_cce_index(). Since new UEs are appended toward the end of UE_list,
+   * a newly-connected UE's very first UL grant (needed to send
+   * RRCSetupComplete, since it has no known buffered data yet) can be
+   * starved indefinitely once enough already-connected UEs at lower
+   * indices keep the quota full every slot.
+   *
+   * (Tried rotating the scan start index instead of this targeted
+   * reordering; that measured worse/noisier connect rates for reasons not
+   * fully root-caused, so it was reverted in favor of this narrower fix.)
+   *
+   * Fix: process UEs that are still waiting for their very first UL grant
+   * (sched_ctrl->initial_ul_grant_pending) before all other UEs, so an
+   * attach-in-progress UE always gets first claim on the shared quota
+   * instead of competing on equal footing against established UEs'
+   * routine SR/inactivity housekeeping grants. This only reorders UEs
+   * within the same per-slot pass; it does not change which UEs are
+   * eligible or how many can be granted. */
+  NR_UE_info_t *ul_sched_order[MAX_MOBILES_PER_GNB];
+  int n_ul_sched_order = 0;
+  { UE_iterator(UE_list, UE) {
+      if (UE->UE_sched_ctrl.initial_ul_grant_pending)
+        ul_sched_order[n_ul_sched_order++] = UE;
+    }
+  }
+  { UE_iterator(UE_list, UE) {
+      if (!UE->UE_sched_ctrl.initial_ul_grant_pending)
+        ul_sched_order[n_ul_sched_order++] = UE;
+    }
+  }
+
+  for (int ue_idx = 0; ue_idx < n_ul_sched_order; ue_idx++) {
+    NR_UE_info_t *UE = ul_sched_order[ue_idx];
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     if (UE->Msg4_ACKed != true || sched_ctrl->ul_failure) {
@@ -1688,8 +1729,13 @@ static void pf_ul(module_id_t module_id,
     const uint32_t b = stats->current_bytes;
     UE->ul_thr_ue = (1 - a) * UE->ul_thr_ue + a * b;
 
-    if(remainUEs == 0)
+    if(remainUEs == 0) {
+      if (sched_ctrl->initial_ul_grant_pending) {
+        printf("[UL-CCE-TRACE] %4d.%2d UE %04x (initial_ul_grant_pending) skipped: remainUEs quota exhausted\n", frame, slot, UE->rnti);
+        fflush(stdout);
+      }
       continue;
+    }
 
     /* Check if retransmission is necessary */
     sched_pusch->ul_harq_pid = sched_ctrl->retrans_ul_harq.head;
@@ -1738,6 +1784,11 @@ static void pf_ul(module_id_t module_id,
 
     LOG_D(NR_MAC,"pf_ul: do_sched UE %04x => %s\n",UE->rnti,do_sched ? "yes" : "no");
     if ((B == 0 && !do_sched) || (sched_ctrl->rrc_processing_timer > 0)) {
+      if (sched_ctrl->initial_ul_grant_pending) {
+        printf("[UL-CCE-TRACE] %4d.%2d UE %04x (initial_ul_grant_pending) skipped: B=%d do_sched=%d rrc_processing_timer=%d\n",
+               frame, slot, UE->rnti, B, do_sched, sched_ctrl->rrc_processing_timer);
+        fflush(stdout);
+      }
       if (gnb_ul_sched_diag_enabled) {
         if (sched_ctrl->rrc_processing_timer > 0)
           ul_skip_rrc_timer++;
@@ -1770,6 +1821,10 @@ static void pf_ul(module_id_t module_id,
                                    &sched_ctrl->sched_pdcch,
                                    false);
       if (CCEIndex<0) {
+        if (sched_ctrl->initial_ul_grant_pending) {
+          printf("[UL-CCE-TRACE] %4d.%2d UE %04x (initial_ul_grant_pending) no free CCE for UL DCI (BSR 0)\n", frame, slot, UE->rnti);
+          fflush(stdout);
+        }
         LOG_D(NR_MAC, "[UE %04x][%4d.%2d] no free CCE for UL DCI (BSR 0)\n",
               UE->rnti,
               frame,
@@ -1829,6 +1884,14 @@ static void pf_ul(module_id_t module_id,
       for (int rb = 0; rb < sched_ctrl->sched_pusch.rbSize; rb++)
         rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] ^= slbitmap;
 
+      if (sched_ctrl->initial_ul_grant_pending || UE->mac_stats.ul.total_bytes < 1000) {
+        printf("[UL-ATTACH-TRACE] %4d.%2d UE %04x: GRANTED UL (BSR-0/SR/inactivity)%s, target %4d.%2d rbStart=%d rbSize=%d tbs=%d total=%"PRIu64"\n",
+               frame, slot, UE->rnti, sched_ctrl->initial_ul_grant_pending ? " [first]" : "",
+               sched_pusch->frame, sched_pusch->slot, sched_pusch->rbStart, sched_pusch->rbSize,
+               sched_pusch->tb_size, UE->mac_stats.ul.total_bytes);
+        fflush(stdout);
+      }
+      sched_ctrl->initial_ul_grant_pending = false;
       remainUEs--;
       continue;
     }
@@ -1850,7 +1913,13 @@ static void pf_ul(module_id_t module_id,
     curUE++;
   }
 
-  qsort(UE_sched, sizeofArray(UE_sched), sizeof(UEsched_t), comparator);
+  // was qsort(UE_sched, sizeofArray(UE_sched), ...): sizeofArray() is the
+  // full MAX_MOBILES_PER_GNB capacity, not curUE, so up to ~49 zero-init
+  // {coef=0, UE=NULL} padding entries were being sorted alongside real ones
+  // by a comparator that isn't a valid strict-weak-ordering for those pairs
+  // (undefined behavior), which could interleave NULL entries among real
+  // ones and have the consumer loop below stop early at a misplaced NULL.
+  qsort(UE_sched, curUE, sizeof(UEsched_t), comparator);
   UEsched_t *iterator=UE_sched;
 
   /* Loop UE_sched to find max coeff and allocate transmission */
@@ -1955,6 +2024,13 @@ static void pf_ul(module_id_t module_id,
       rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] ^= slbitmap;
 
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
+    if (iterator->UE->mac_stats.ul.total_bytes < 1000) {
+      printf("[UL-ATTACH-TRACE] %4d.%2d UE %04x: GRANTED UL (BSR data B=%d), target %4d.%2d rbSize=%d tbs=%d total=%"PRIu64"\n",
+             frame, slot, iterator->UE->rnti, B, sched_pusch->frame, sched_pusch->slot,
+             sched_pusch->rbSize, sched_pusch->tb_size, iterator->UE->mac_stats.ul.total_bytes);
+      fflush(stdout);
+    }
+    sched_ctrl->initial_ul_grant_pending = false;
     remainUEs--;
     if (gnb_ul_sched_diag_enabled) {
       ul_grants_data++;
