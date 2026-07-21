@@ -138,6 +138,7 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
             rach_ind->pdu_list[pdu_index].preamble_list[0].preamble_pwr = 0xffffffff;
 
             if (!put_queue(&nr_rach_ind_queue, rach_ind)) {
+              LOG_E(NR_PHY, "put_queue FAILED for rach_ind\n");
               for (int pdu_index = 0; pdu_index < rach_ind->number_of_pdus; pdu_index++)
                 free(rach_ind->pdu_list[pdu_index].preamble_list);
               free(rach_ind->pdu_list);

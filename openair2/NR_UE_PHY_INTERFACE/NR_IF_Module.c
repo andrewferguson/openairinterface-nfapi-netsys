@@ -695,8 +695,6 @@ static void copy_ul_dci_data_req_to_dl_info(nr_downlink_indication_t *dl_info, n
 
 static bool send_crc_ind_and_rx_ind(int sfn_slot)
 {
-  bool sent_crc_rx = true;
-
   nfapi_nr_rx_data_indication_t *rx_ind = unqueue_matching(&nr_rx_ind_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &sfn_slot);
   nfapi_nr_crc_indication_t *crc_ind = unqueue_matching(&nr_crc_ind_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &sfn_slot);
   if (rx_ind == NULL && crc_ind == NULL) {
@@ -704,11 +702,26 @@ static bool send_crc_ind_and_rx_ind(int sfn_slot)
     return false;
   }
 
-
-
-
-  if ((crc_ind && crc_ind->number_crcs > 0)&& (rx_ind && rx_ind->number_of_pdus > 0))
-    {  
+  if (!(crc_ind && crc_ind->number_crcs > 0 && rx_ind && rx_ind->number_of_pdus > 0))
+    {
+      /* Only half of the CRC/RX pair (or an empty indication) is available.
+         Dropping the half we dequeued would silently lose this UE's UL
+         transmission, so put it back until its counterpart shows up. */
+      LOG_E(NR_MAC, "[%d.%d] Incomplete CRC/RX pair (rx pdus: %d, crcs: %d), requeueing\n",
+            NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot),
+            rx_ind ? rx_ind->number_of_pdus : -1, crc_ind ? crc_ind->number_crcs : -1);
+      if (rx_ind && !put_queue(&nr_rx_ind_queue, rx_ind)) {
+        for (int i = 0; i < rx_ind->number_of_pdus; i++)
+          free(rx_ind->pdu_list[i].pdu);
+        free(rx_ind->pdu_list);
+        free(rx_ind);
+      }
+      if (crc_ind && !put_queue(&nr_crc_ind_queue, crc_ind)) {
+        free(crc_ind->crc_list);
+        free(crc_ind);
+      }
+      return false;
+    }
 
     NR_UL_IND_t UL_INFO = {
       .rx_ind = *rx_ind,
@@ -730,15 +743,8 @@ static bool send_crc_ind_and_rx_ind(int sfn_slot)
       send_nsa_standalone_msg(&UL_INFO2, crc_ind->header.message_id);
       free(crc_ind->crc_list);
       free(crc_ind);
-    }
-  else
-    {
-      LOG_E(NR_MAC, "[%d.%d]No RX indication to send rx_ind->number_of_pdus :  %d \n", NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot), rx_ind->number_of_pdus);
-      sent_crc_rx = false;
-      return sent_crc_rx;
-    }
-  
- return sent_crc_rx;
+
+ return true;
 }
 
 static void copy_ul_tti_data_req_to_dl_info(nr_downlink_indication_t *dl_info, nfapi_nr_ul_tti_request_t *ul_tti_req)
@@ -754,9 +760,17 @@ static void copy_ul_tti_data_req_to_dl_info(nr_downlink_indication_t *dl_info, n
     if (!send_crc_ind_and_rx_ind(sfn_slot))
     {
         LOG_I(NR_MAC, "CRC_RX ind not sent\n");
-        if (!put_queue(&nr_ul_tti_req_queue, ul_tti_req))
+        /* The caller owns ul_tti_req and frees it after we return, so we must
+           requeue a copy — requeueing the caller's pointer leaves a dangling
+           entry in nr_ul_tti_req_queue that the sfn_slot_matcher then scans
+           every slot ("sfn_slot_match bad ID" flood) and that gets
+           double-freed by the post-RA queue flush. */
+        nfapi_nr_ul_tti_request_t *requeue_copy = MALLOC(sizeof(*requeue_copy));
+        *requeue_copy = *ul_tti_req;
+        if (!put_queue(&nr_ul_tti_req_queue, requeue_copy))
         {
             LOG_E(NR_PHY, "put_queue failed for ul_tti_req.\n");
+            free(requeue_copy);
         }
         return;
     }
@@ -922,6 +936,40 @@ void save_nr_measurement_info(nfapi_nr_dl_tti_request_t *dl_tti_request)
     LOG_A(NR_RRC, "Populated NR_UE_RRC_MEASUREMENT information and sent to LTE UE\n");
 }
 
+/* True when the queued UL_TTI_REQ is more than 100 slots away (wrap-aware)
+   from the reference sfn*20+slot — a leftover that can only ever alias a
+   future SFN wrap, so it must be dropped. */
+static bool ul_tti_stale(void *wanted, void *candidate)
+{
+  nfapi_p7_message_header_t *msg = candidate;
+  if (msg->message_id != NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST)
+    return true;
+  nfapi_nr_ul_tti_request_t *req = candidate;
+  int now = *(int *)wanted;
+  int cand = req->SFN * 20 + req->Slot;
+  int diff = ((cand - now + 20480 + 10240) % 20480) - 10240;
+  return diff < -100 || diff > 100;
+}
+
+/* True when the queued UL_TTI_REQ has no PUSCH PDU for the given RNTI —
+   i.e. it is another UE's broadcast entry and safe to evict. */
+static bool ul_tti_pusch_not_for_rnti(void *wanted, void *candidate)
+{
+  nfapi_p7_message_header_t *msg = candidate;
+  if (msg->message_id != NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST)
+    return true;
+  nfapi_nr_ul_tti_request_t *req = candidate;
+  uint16_t rnti = *(uint16_t *)wanted;
+  if (rnti == 0)
+    return true;
+  for (int i = 0; i < req->n_pdus; i++) {
+    if (req->pdus_list[i].pdu_type == NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE &&
+        req->pdus_list[i].pusch_pdu.rnti == rnti)
+      return false;
+  }
+  return true;
+}
+
 static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_header_t header)
 {
      static int once = 0;
@@ -1014,39 +1062,72 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE. If we have not yet completed the CBRA/
                CFRA procedure, we need to queue all UL_TTI_REQs. */
 
-            if( mac->ra.ra_state >= RA_SUCCEEDED)
-            {
-                while(nr_ul_tti_req_queue.num_items > 0 ){
-                    nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = unqueue(&nr_ul_tti_req_queue);
-                    free(evicted_ul_tti_req);
-                    
-                }
-                
-            }
+            /* The proxy broadcasts every UE's UL_TTI_REQ to all UEs, so this
+               queue mostly churns with other UEs' PUSCH requests, and with a
+               small FIFO cap our own Msg3 trigger used to get evicted before
+               the local rx/crc pair was ready to be matched against it
+               (=> gNB stuck in WAIT_Msg3, contention resolution expiry loop).
 
-            for (int i = 0; i < ul_tti_request->n_pdus; i++) {
-                if (ul_tti_request->pdus_list[i].pdu_type == NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE &&
-                    mac->ra.ra_state >= RA_SUCCEEDED) {
-                    
-                    if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
-                    {
-                        LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
-                        nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = put_queue_replace(&nr_ul_tti_req_queue, ul_tti_request);
-                        free(evicted_ul_tti_req);
+               Connected (RA_SUCCEEDED): only queue UL_TTI_REQs whose PUSCH is
+               addressed to our C-RNTI, newest-wins.
+
+               During RA: our TC-RNTI may not be known yet when the Msg3
+               UL_TTI_REQ arrives (RAR still queued), so we must queue
+               everything — but evict other UEs' entries first, never our own. */
+            if (mac->ra.ra_state >= RA_SUCCEEDED) {
+                /* The old post-RA behaviour flushed this whole queue on every
+                   arrival. Since the proxy broadcasts every UE's UL_TTI_REQ to
+                   every pod, arrivals happen nearly every slot once several
+                   UEs are connected, so our own PUSCH trigger was freed before
+                   the slot loop could match it and send the rx/crc pair: the
+                   gNB then saw DTX on most of its grants (19 grants -> 3
+                   rx_sdus) and SRB1 never progressed. Keep only UL_TTI_REQs
+                   carrying a PUSCH for our C-RNTI and let the slot loop
+                   consume them; GC anything old enough to alias an SFN wrap. */
+                int now = ul_tti_request->SFN * 20 + ul_tti_request->Slot;
+                nfapi_nr_ul_tti_request_t *stale;
+                while ((stale = unqueue_matching(&nr_ul_tti_req_queue, MAX_QUEUE_SIZE, ul_tti_stale, &now)))
+                    free(stale);
+                /* Keep any UL_TTI carrying a PUSCH: the send trigger is
+                   matched by slot only, and the received copy often lacks our
+                   own PUSCH PDU (2nd-PUSCH corruption upstream), so filtering
+                   by RNTI here silences the UE entirely. */
+                bool keep = false;
+                for (int i = 0; i < ul_tti_request->n_pdus; i++) {
+                    if (ul_tti_request->pdus_list[i].pdu_type == NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE) {
+                        keep = true;
+                        break;
                     }
-                    break;
                 }
-                else if (mac->ra.ra_state < RA_SUCCEEDED) {
-                    LOG_I(NR_PHY, "RA not succeeded, queuing ul_tti_request.\n");
-                    if(nr_ul_tti_req_queue.num_items == 5)
-                        unqueue(&nr_ul_tti_req_queue);
+                if (keep) {
+                    if (nr_ul_tti_req_queue.num_items >= 8) {
+                        nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = unqueue(&nr_ul_tti_req_queue);
+                        free(evicted_ul_tti_req);
+                    }
                     if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
                     {
                         LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
                         nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = put_queue_replace(&nr_ul_tti_req_queue, ul_tti_request);
                         free(evicted_ul_tti_req);
                     }
-                    break;
+                } else {
+                    free(ul_tti_request);
+                }
+            } else {
+                uint16_t own_rnti = mac->ra.t_crnti;
+                if (nr_ul_tti_req_queue.num_items >= 8) {
+                    /* Prefer evicting an entry that has no PUSCH for our TC-RNTI. */
+                    nfapi_nr_ul_tti_request_t *evicted_ul_tti_req =
+                        unqueue_matching(&nr_ul_tti_req_queue, MAX_QUEUE_SIZE, ul_tti_pusch_not_for_rnti, &own_rnti);
+                    if (!evicted_ul_tti_req)
+                        evicted_ul_tti_req = unqueue(&nr_ul_tti_req_queue);
+                    free(evicted_ul_tti_req);
+                }
+                if (!put_queue(&nr_ul_tti_req_queue, ul_tti_request))
+                {
+                    LOG_E(NR_PHY, "put_queue failed for ul_tti_request, calling put_queue_replace.\n");
+                    nfapi_nr_ul_tti_request_t *evicted_ul_tti_req = put_queue_replace(&nr_ul_tti_req_queue, ul_tti_request);
+                    free(evicted_ul_tti_req);
                 }
             }
             break;

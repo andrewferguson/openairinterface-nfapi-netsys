@@ -2314,14 +2314,32 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
                 else ue_stat_nack_real++;
                 // High-rate ACK tracing disabled for throughput runs.
               } else if (get_softmodem_params()->emulate_l1) {
-                /* Emulated-L1 decode indication may arrive after PUCCH timing.
-                 * Use ACK fallback to avoid artificial HARQ retransmission storms. */
-                ack_data[code_word][dai_current - 1] = 1;
-                current_harq->ack = 1;
-                current_harq->active = false;
-                current_harq->ack_received = false;
-                ue_stat_fb_missing++;
-                // High-rate ACK tracing disabled for throughput runs.
+                if (mac->ra.ra_state == WAIT_CONTENTION_RESOLUTION) {
+                  /* While waiting for Msg4, blindly ACKing a PDSCH we never
+                   * decoded is fatal: the gNB takes the ACK as proof Msg4
+                   * (contention resolution) was delivered and completes RA,
+                   * while this UE's contention resolution timer expires and it
+                   * re-RACHes forever. NACK so the gNB retransmits Msg4 until
+                   * the payload really arrives. Outside this window keep the
+                   * ACK fallback — NACKing routine SIB decode misses from idle
+                   * UEs causes DL retransmission storms that starve RA. */
+                  ack_data[code_word][dai_current - 1] = 0;
+                  current_harq->ack = 0;
+                  current_harq->active = false;
+                  current_harq->ack_received = false;
+                  ue_stat_fb_missing++;
+                  LOG_I(NR_MAC, "%4d.%2d harq pid %d: no decode indication by PUCCH time during RA, sending NACK\n",
+                        frame, slot, dl_harq_pid);
+                } else {
+                  /* Emulated-L1 decode indication may arrive after PUCCH timing.
+                   * Use ACK fallback to avoid artificial HARQ retransmission storms. */
+                  ack_data[code_word][dai_current - 1] = 1;
+                  current_harq->ack = 1;
+                  current_harq->active = false;
+                  current_harq->ack_received = false;
+                  ue_stat_fb_missing++;
+                  // High-rate ACK tracing disabled for throughput runs.
+                }
               } else {
                 LOG_E(NR_MAC, "DLSCH ACK/NACK reporting initiated for harq pid %d before DLSCH decoding completed for now marking as compelete \n", dl_harq_pid);
                 ack_data[code_word][dai_current - 1] = 0;
@@ -3821,10 +3839,13 @@ void nr_ue_process_mac_pdu(nr_downlink_indication_t *dl_info,
           if ( (ra->RA_active == 1) && ra_success) {
             nr_ra_succeeded(module_idP, gNB_index, frameP, slot);
           } else if (!ra_success){
-            // TODO: Handle failure of RA procedure @ MAC layer
-            //  nr_ra_failed(module_idP, CC_id, prach_resources, frameP, slot); // prach_resources is a PHY structure
-            ra->ra_state = RA_UE_IDLE;
-            ra->RA_active = 0;
+            // was: dead code (nr_ra_failed() call commented out with a stale
+            // TODO), leaving RA_contention_resolution_timer_active set so the
+            // mismatch was indistinguishable from a genuine non-reception --
+            // both just silently waited out the same timer before retrying,
+            // producing identical "timer expired" log lines either way. Fail
+            // fast/loud on a real mismatch instead.
+            nr_ra_failed(module_idP, CC_id, &ra->prach_resources, frameP, slot);
           }
         }
         break;

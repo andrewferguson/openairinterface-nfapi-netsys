@@ -2972,15 +2972,28 @@ void pnf_nr_nfapi_p7_read_dispatch_message(pnf_p7_t* pnf_p7, uint32_t now_hr_tim
 				pnf_p7->rx_message_buffer_size = header.message_length;
 			}
 
-			// read the segment
-			recvfrom_result = recvfrom(pnf_p7->p7_sock, pnf_p7->rx_message_buffer, header.message_length, MSG_DONTWAIT, (struct sockaddr*)&remote_addr, &remote_addr_size);
+			// read the segment. Use MSG_TRUNC + the full buffer capacity (not
+			// header.message_length) so a real datagram larger than the
+			// header's claimed length is detected instead of being silently
+			// truncated and dispatched as a short, misaligned message.
+			recvfrom_result = recvfrom(pnf_p7->p7_sock, pnf_p7->rx_message_buffer, pnf_p7->rx_message_buffer_size,
+			                            MSG_DONTWAIT | MSG_TRUNC, (struct sockaddr*)&remote_addr, &remote_addr_size);
 
 		now_hr_time = pnf_get_current_time_hr(); //moved to here - get closer timestamp???
 
 			if(recvfrom_result > 0)
 			{
-				pnf_nr_handle_p7_message(pnf_p7->rx_message_buffer, recvfrom_result, pnf_p7, now_hr_time);
-				//printf("\npnf_handle_p7_message sfn=%d,slot=%d\n",pnf_p7->sfn,pnf_p7->slot);
+				if (recvfrom_result != header.message_length)
+				{
+					NFAPI_TRACE(NFAPI_TRACE_ERROR,
+					            "%s(%d) NR P7 message length mismatch, dropping: recvfrom=%d header.message_length=%d sfn_sf=%d\n",
+					            __FUNCTION__, __LINE__, recvfrom_result, header.message_length, header.m_segment_sequence);
+				}
+				else
+				{
+					pnf_nr_handle_p7_message(pnf_p7->rx_message_buffer, recvfrom_result, pnf_p7, now_hr_time);
+					//printf("\npnf_handle_p7_message sfn=%d,slot=%d\n",pnf_p7->sfn,pnf_p7->slot);
+				}
 			}
 		}
 		else if(recvfrom_result == 0)

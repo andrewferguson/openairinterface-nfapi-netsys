@@ -225,24 +225,26 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
       free_and_zero(rach_ind->pdu_list);
       free_and_zero(rach_ind);
   }
-  if (dl_tti_request) {
+  /* Drain the whole dl_tti queue each slot indication. With many UEs the
+     proxy broadcasts every UE's traffic to everyone; processing only one
+     message per slot lets the queue back up until DCIs are handled after
+     their target slot has passed, stalling attach for late UEs. */
+  while (dl_tti_request) {
     int dl_tti_sfn_slot = NFAPI_SFNSLOT2HEX(dl_tti_request->SFN, dl_tti_request->Slot);
     int check_count = 0;
     nfapi_nr_tx_data_request_t *tx_data_request = NULL;
     while(check_count < 10) {
-       if(check_count !=0)
-        // printf("[%d.%d] Checking tx_Data_request for %d times \n", NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot), check_count);
         tx_data_request = unqueue_matching(&nr_tx_req_queue, MAX_QUEUE_SIZE, sfn_slot_matcher, &dl_tti_sfn_slot);
         if(tx_data_request)
           break;
         usleep(100);
-         check_count++;
+        check_count++;
     }
     if (!tx_data_request) {
       /* No matching tx_data_request found. Process DCI from dl_tti_request anyway
          (e.g. SSB-only or UL DCI that doesn't need PDSCH data). If a PDSCH DCI
          was present, the emulation mode ACK fallback will handle the missing ack. */
-      LOG_D(NR_MAC, "[%d %d] No corresponding tx_data_request for given dl_tti_request sfn/slot, processing DCI only\n",
+      LOG_I(NR_MAC, "[%d %d] No corresponding tx_data_request for given dl_tti_request sfn/slot, processing DCI only\n",
             NFAPI_SFNSLOT2SFN(dl_tti_sfn_slot), NFAPI_SFNSLOT2SLOT(dl_tti_sfn_slot));
       if (get_softmodem_params()->nsa)
         save_nr_measurement_info(dl_tti_request);
@@ -262,10 +264,14 @@ static void process_queued_nr_nfapi_msgs(NR_UE_MAC_INST_t *mac, int sfn_slot)
       free_and_zero(dl_tti_request);
       free_and_zero(tx_data_request);
     }
+    dl_tti_request = get_queue(&nr_dl_tti_req_queue);
   }
-  if (ul_dci_request && ul_dci_request->numPdus > 0) {
-    check_and_process_dci(NULL, NULL, ul_dci_request, NULL);
+  /* Drain all pending UL DCIs as well, for the same reason. */
+  while (ul_dci_request) {
+    if (ul_dci_request->numPdus > 0)
+      check_and_process_dci(NULL, NULL, ul_dci_request, NULL);
     free_and_zero(ul_dci_request);
+    ul_dci_request = get_queue(&nr_ul_dci_req_queue);
   }
 }
 
@@ -319,6 +325,19 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
       continue;
     }
     last_sfn_slot = sfn_slot;
+
+    /* In emulated-L1 mode the real PHY thread (which normally drives
+       nr_rlc_tick/nr_pdcp_tick) never runs, leaving all RLC AM timers
+       (t-PollRetransmit, t-Reassembly, t-StatusProhibit) frozen: a single
+       lost PDU between UE and gNB is then never retransmitted and the
+       attach stalls forever. Drive the L2 clocks from the slot
+       indications instead (30 kHz SCS: 2 slots per subframe). */
+    {
+      void nr_rlc_tick(int frame, int subframe);
+      void nr_pdcp_tick(int frame, int subframe);
+      nr_rlc_tick(frame, slot >> 1);
+      nr_pdcp_tick(frame, slot >> 1);
+    }
 
     LOG_D(NR_MAC, "The received sfn/slot [%d %d] from proxy\n",
           frame, slot);
