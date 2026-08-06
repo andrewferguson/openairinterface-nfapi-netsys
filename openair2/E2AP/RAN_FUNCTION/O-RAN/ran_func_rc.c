@@ -30,6 +30,28 @@
 #include <pthread.h>
 #include <unistd.h>
 
+/* EMURAN: closed-loop xApp control -- actually retargets MAC link
+ * adaptation instead of just printf'ing, under style=1 act_id=10:
+ *   ran_param 11 = DL max MCS
+ *   ran_param 12 = UL max MCS
+ *   ran_param 13 = DL BLER target (x1000), e.g. 50 for 0.05
+ * The BLER target is represented internally as an [lower, upper]
+ * hysteresis band (see get_mcs_from_bler() in
+ * gNB_scheduler_primitives.c); this preserves the config default's
+ * band half-width (upper=0.15, lower=0.05 -> half-width 0.05) around
+ * whatever new target the xApp requests. */
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
+#include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+
+/* EMURAN: half-width 0.05 (matching the config default's 0.05-0.15 band)
+ * makes lower == 0.0 exactly for the paper's 0.05 target, and
+ * get_mcs_from_bler()'s "raise MCS" condition is bler < lower -- with
+ * lower == 0.0 that can never be true (bler is never negative), so MCS
+ * can only ratchet down and never recover. Use a narrower half-width so
+ * lower stays strictly positive for both paper targets (0.05 -> 0.03,
+ * 0.20 -> 0.18). */
+#define EMURAN_BLER_TARGET_HALF_WIDTH 0.02
+
 void read_rc_sm(void* data)
 {
   assert(data != NULL);
@@ -80,7 +102,47 @@ sm_ag_if_ans_t write_ctrl_rc_sm(void const* data)
             assert(dir == 0 || dir == 1);
             printf("qfi = %ld dir %ld \n", qfi, dir);
           }
-        } 
+        }
+      }
+    } else if(ctrl->hdr.frmt_1.ric_style_type == 1 && ctrl->hdr.frmt_1.ctrl_act_id == 10){
+      printf("[EMURAN RC] scheduler-visible control (style=1 act=10)\n");
+      e2sm_rc_ctrl_msg_frmt_1_t const* frmt_1 = &ctrl->msg.frmt_1;
+      for(size_t i = 0; i < frmt_1->sz_ran_param; ++i){
+        seq_ran_param_t const* rp = frmt_1->ran_param;
+        if(rp[i].ran_param_val.type != ELEMENT_KEY_FLAG_TRUE_RAN_PARAMETER_VAL_TYPE
+           && rp[i].ran_param_val.type != ELEMENT_KEY_FLAG_FALSE_RAN_PARAMETER_VAL_TYPE)
+          continue;
+        int64_t val = rp[i].ran_param_val.flag_true->int_ran;
+
+        gNB_MAC_INST *nr_mac = RC.nrmac[0];
+        if (nr_mac == NULL) {
+          printf("[EMURAN RC] RC.nrmac[0] not yet initialized, dropping control\n");
+          continue;
+        }
+
+        if(rp[i].ran_param_id == 11){ // DL max MCS
+          NR_SCHED_LOCK(&nr_mac->sched_lock);
+          printf("[EMURAN RC] dl_bler.max_mcs %d -> %ld\n", nr_mac->dl_bler.max_mcs, val);
+          nr_mac->dl_bler.max_mcs = (uint8_t)val;
+          NR_SCHED_UNLOCK(&nr_mac->sched_lock);
+        } else if(rp[i].ran_param_id == 12){ // UL max MCS
+          NR_SCHED_LOCK(&nr_mac->sched_lock);
+          printf("[EMURAN RC] ul_bler.max_mcs %d -> %ld\n", nr_mac->ul_bler.max_mcs, val);
+          nr_mac->ul_bler.max_mcs = (uint8_t)val;
+          NR_SCHED_UNLOCK(&nr_mac->sched_lock);
+        } else if(rp[i].ran_param_id == 13){ // DL BLER target (x1000)
+          double target = val / 1000.0;
+          double lower = target - EMURAN_BLER_TARGET_HALF_WIDTH;
+          double upper = target + EMURAN_BLER_TARGET_HALF_WIDTH;
+          if (lower < 0.0) lower = 0.0;
+          if (upper > 1.0) upper = 1.0;
+          NR_SCHED_LOCK(&nr_mac->sched_lock);
+          printf("[EMURAN RC] dl_bler target -> %.3f (lower %.3f -> %.3f, upper %.3f -> %.3f)\n",
+                 target, nr_mac->dl_bler.lower, lower, nr_mac->dl_bler.upper, upper);
+          nr_mac->dl_bler.lower = lower;
+          nr_mac->dl_bler.upper = upper;
+          NR_SCHED_UNLOCK(&nr_mac->sched_lock);
+        }
       }
     }
   }

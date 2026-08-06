@@ -686,11 +686,7 @@ static void pf_dl(module_id_t module_id,
       const NR_bler_options_t *bo = &mac->dl_bler;
       const int max_mcs_table = current_BWP->mcsTableIdx == 1 ? 27 : 28;
       const int max_mcs = min(sched_ctrl->dl_max_mcs, max_mcs_table);
-      if (get_softmodem_params()->emulate_l1) {
-        /* In L1 emulation, enforce peak MCS directly to avoid BLER-loop
-         * clamping caused by non-RF feedback/timing artifacts. */
-        sched_pdsch->mcs = max_mcs;
-      } else if (bo->harq_round_max == 1) {
+      if (bo->harq_round_max == 1) {
         sched_pdsch->mcs = max_mcs;
       } else {
         sched_pdsch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->dl_bler_stats, max_mcs, frame);

@@ -29,6 +29,7 @@
  */
 
 
+#include <time.h>
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "executables/softmodem-common.h"
 #include "common/utils/nr/nr_common.h"
@@ -2193,8 +2194,60 @@ nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id)
   return nr_fr1_ulsch_preprocessor;
 }
 
+/* EMURAN: periodic (150ms wall-clock) PER-UE UL RB allocation logging,
+ * for the ECDF-of-RB-allocation figure -- one sample per UE per window
+ * (the figure characterizes each UE's own RB share under varying
+ * #UEs/traffic mix, not the aggregate across the cell). Keyed by RNTI in
+ * a small fixed table, reset every window; only UEs actually granted a
+ * nonzero allocation that window are emitted (so an idle UE doesn't
+ * contribute a flood of zero-samples every 150ms). */
+#define EMURAN_UL_RB_MAX_UES 32
+static struct { uint16_t rnti; uint32_t rb; } emuran_ul_rb_per_ue[EMURAN_UL_RB_MAX_UES];
+static int emuran_ul_rb_per_ue_count = 0;
+static struct timespec emuran_ul_rb_window_start = {0, 0};
+static double emuran_ul_rb_elapsed_total_ms = 0.0;
+
+static void emuran_ul_rb_add(uint16_t rnti, uint32_t rb)
+{
+  for (int i = 0; i < emuran_ul_rb_per_ue_count; i++) {
+    if (emuran_ul_rb_per_ue[i].rnti == rnti) {
+      emuran_ul_rb_per_ue[i].rb += rb;
+      return;
+    }
+  }
+  if (emuran_ul_rb_per_ue_count < EMURAN_UL_RB_MAX_UES) {
+    emuran_ul_rb_per_ue[emuran_ul_rb_per_ue_count].rnti = rnti;
+    emuran_ul_rb_per_ue[emuran_ul_rb_per_ue_count].rb = rb;
+    emuran_ul_rb_per_ue_count++;
+  }
+}
+
+static void emuran_ul_rb_flush_if_due(void)
+{
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (emuran_ul_rb_window_start.tv_sec == 0 && emuran_ul_rb_window_start.tv_nsec == 0) {
+    emuran_ul_rb_window_start = now;
+    return;
+  }
+  double elapsed_ms = (now.tv_sec - emuran_ul_rb_window_start.tv_sec) * 1000.0
+                     + (now.tv_nsec - emuran_ul_rb_window_start.tv_nsec) / 1e6;
+  if (elapsed_ms >= 150.0) {
+    emuran_ul_rb_elapsed_total_ms += elapsed_ms;
+    double t = emuran_ul_rb_elapsed_total_ms / 1000.0;
+    for (int i = 0; i < emuran_ul_rb_per_ue_count; i++) {
+      fprintf(stderr, "EMURAN-RB-CSV t=%.3f rnti=%04x ul_rb=%u\n",
+              t, emuran_ul_rb_per_ue[i].rnti, emuran_ul_rb_per_ue[i].rb);
+    }
+    fflush(stderr);
+    emuran_ul_rb_per_ue_count = 0;
+    emuran_ul_rb_window_start = now;
+  }
+}
+
 void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req)
 {
+  emuran_ul_rb_flush_if_due();
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nr_mac->sched_lock);
@@ -2235,6 +2288,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
     LOG_D(NR_MAC,"UE %04x : sched_pusch->rbSize %d\n",UE->rnti,sched_pusch->rbSize);
     if (sched_pusch->rbSize <= 0)
       continue;
+    emuran_ul_rb_add(UE->rnti, sched_pusch->rbSize);
 
     uint16_t rnti = UE->rnti;
     sched_ctrl->SR = false;

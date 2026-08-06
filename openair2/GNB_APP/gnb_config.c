@@ -2294,6 +2294,8 @@ e2_agent_args_t RCconfig_NR_E2agent(void)
   if (e2agent_params[E2AGENT_CONFIG_IP_IDX].strptr != NULL)
     dst.ip = *e2agent_params[E2AGENT_CONFIG_IP_IDX].strptr;
 
+  dst.node_id = *e2agent_params[E2AGENT_CONFIG_NODE_ID_IDX].uptr;
+
   return dst;
 }
 

@@ -1329,13 +1329,20 @@ typedef struct srb1_params_s {
 #define E2AGENT_CONFIG_IP    "near_ric_ip_addr"
 //#define E2AGENT_CONFIG_PORT  "port"
 #define E2AGENT_CONFIG_SMDIR "sm_dir"
+/* EMURAN: E2 node ID, separate from gNB_ID -- FlexRIC asserts nb_id > 0,
+ * but this deployment breaks (nFAPI stalls after CONFIG_REQ, UE never
+ * attaches) if gNB_ID != 0. This lets the E2 node ID be non-zero while
+ * gNB_ID stays 0. See docs/E2_XAPP_SETUP.md. */
+#define E2AGENT_CONFIG_NODE_ID "e2_node_id"
 
 static const char* const e2agent_config_ip_default = "127.0.0.1";
 static const char* const e2agent_config_smdir_default = ".";
+static const uint32_t e2agent_config_node_id_default = 1;
 
 #define E2AGENT_PARAMS_DESC { \
   {E2AGENT_CONFIG_IP,    "RIC IP address",             0, strptr:NULL, defstrval:(char*)e2agent_config_ip_default,    TYPE_STRING, 0}, \
   {E2AGENT_CONFIG_SMDIR, "Directory with SMs to load", 0, strptr:NULL, defstrval:(char*)e2agent_config_smdir_default, TYPE_STRING, 0}, \
+  {E2AGENT_CONFIG_NODE_ID, "E2 node ID (independent of gNB_ID)", 0, uptr:NULL, defuintval:e2agent_config_node_id_default, TYPE_UINT32, 0}, \
 }
 /*
 //  {E2AGENT_CONFIG_PORT,  "RIC port",                   0, u16ptr:NULL, defuintval:e2agent_config_port_default,        TYPE_UINT16, 0}, \
@@ -1344,6 +1351,7 @@ static const char* const e2agent_config_smdir_default = ".";
 
 #define E2AGENT_CONFIG_IP_IDX    0
 #define E2AGENT_CONFIG_SMDIR_IDX 1
+#define E2AGENT_CONFIG_NODE_ID_IDX 2
 //#define E2AGENT_CONFIG_PORT_IDX  2
 
 #endif // E2_AGENT

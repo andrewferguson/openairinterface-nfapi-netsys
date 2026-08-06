@@ -595,7 +595,11 @@ static void initialize_agent(ngran_node_t node_type, e2_agent_args_t oai_args)
   int nb_id = 0;
   int cu_du_id = 0;
   if (node_type == ngran_gNB) {
-    nb_id = rrc->node_id;
+    /* EMURAN: FlexRIC asserts nb_id > 0, but this deployment breaks if
+     * gNB_ID (== rrc->node_id) is nonzero (nFAPI stalls after CONFIG_REQ,
+     * UE never attaches). Use the independent e2_node_id config param
+     * instead when set, so gNB_ID can stay 0. See docs/E2_XAPP_SETUP.md. */
+    nb_id = oai_args.node_id != 0 ? (int)oai_args.node_id : rrc->node_id;
   } else if (node_type == ngran_gNB_DU) {
     const gNB_MAC_INST* mac = RC.nrmac[0];
     AssertFatal(mac != NULL, "MAC not initialized\n");

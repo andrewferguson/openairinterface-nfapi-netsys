@@ -29,6 +29,7 @@ typedef struct{
   const char *ip;
   const char *sm_dir;
   const bool enabled;
+  uint32_t node_id; // EMURAN: E2 node ID, independent of gNB_ID (must stay 0)
 } e2_agent_args_t;
 
 #endif

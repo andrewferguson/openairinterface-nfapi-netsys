@@ -640,7 +640,7 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
                       NR_bler_stats_t *bler_stats,
                       int max_mcs,
                       frame_t frame)
-{ return 28;
+{
   /* first call: everything is zero. Initialize to sensible default */
   if (bler_stats->last_frame == 0 && bler_stats->mcs == 0) {
     bler_stats->last_frame = frame;
