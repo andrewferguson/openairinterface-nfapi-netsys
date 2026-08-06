@@ -399,14 +399,22 @@ bool pdcp_data_ind(const protocol_ctxt_t *const  ctxt_pP,
 
 #include "LAYER2/MAC/mac_extern.h"
 
+/* EMURAN: netlink_init_tun() stores a UE's tun fd at index (id - 1) in
+ * nas_sock_fd[] (see netlink_init.c), not always at index 0 -- only the
+ * first-launched UE (id == 1) happens to land at index 0. Every later UE
+ * (id >= 2) needs this index to find its own fd, otherwise readers here
+ * fall back on nas_sock_fd[0]'s zero-initialized default (fd 0 / stdin)
+ * and spin reading garbage instead of their real tun device. */
+int ue_tun_fd_idx = 0;
+
 static void reblock_tun_socket(void)
 {
   extern int nas_sock_fd[];
   int f;
 
-  f = fcntl(nas_sock_fd[0], F_GETFL, 0);
+  f = fcntl(nas_sock_fd[ue_tun_fd_idx], F_GETFL, 0);
   f &= ~(O_NONBLOCK);
-  if (fcntl(nas_sock_fd[0], F_SETFL, f) == -1) {
+  if (fcntl(nas_sock_fd[ue_tun_fd_idx], F_SETFL, f) == -1) {
     LOG_E(PDCP, "reblock_tun_socket failed\n");
     exit(1);
   }
@@ -467,9 +475,9 @@ static void *ue_tun_read_thread(void *_)
   int has_ue;
 
   int rb_id = 1;
-  pthread_setname_np( pthread_self(),"ue_tun_read"); 
+  pthread_setname_np( pthread_self(),"ue_tun_read");
   while (1) {
-    len = read(nas_sock_fd[0], &rx_buf, NL_MAX_PAYLOAD);
+    len = read(nas_sock_fd[ue_tun_fd_idx], &rx_buf, NL_MAX_PAYLOAD);
     if (len == -1) {
       LOG_E(PDCP, "%s:%d:%s: fatal\n", __FILE__, __LINE__, __FUNCTION__);
       exit(1);
@@ -610,6 +618,7 @@ uint64_t nr_pdcp_module_init(uint64_t _pdcp_optmask, int id)
       char *ifsuffix_ue = get_softmodem_params()->nsa ? "nrue" : "ue";
       int num_if = (NFAPI_MODE == NFAPI_UE_STUB_PNF || IS_SOFTMODEM_SIML1 || NFAPI_MODE == NFAPI_MODE_STANDALONE_PNF)? MAX_MOBILES_PER_ENB : 1;
       netlink_init_tun(ifsuffix_ue, num_if, id);
+      ue_tun_fd_idx = (id > 0) ? id - 1 : 0;
       //Add --nr-ip-over-lte option check for next line
       if (IS_SOFTMODEM_NOS1){
         nas_config(1, 1, !get_softmodem_params()->nsa ? 2 : 3, ifsuffix_ue);

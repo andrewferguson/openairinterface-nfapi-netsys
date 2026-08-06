@@ -50,6 +50,12 @@
 #include <openair3/NAS/COMMON/NR_NAS_defs.h>
 #include <openair1/PHY/phy_extern_nr_ue.h>
 #include <openair1/SIMULATION/ETH_TRANSPORT/proto.h>
+
+/* EMURAN: same per-process UE index that already drives the proxy relay
+ * port formula (3611/3612 + ue_proxy_id*2, see init_nrUE_standalone_thread
+ * in nr-ue.c) -- reused here so concurrent native UE processes on one host
+ * don't all fight over the same oaitun_ue1 device. */
+extern uint16_t ue_proxy_id;
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 #include "openair3/SECU/nas_stream_eia2.h"
 #include "openair3/UTILS/conversions.h"
@@ -1242,7 +1248,7 @@ void *nas_nrue(void *args_p)
                         *(payload_container + offset + 4),
                         *(payload_container + offset + 5),
                         *(payload_container + offset + 6));
-                  nas_config(1, third_octet, fourth_octet, "oaitun_ue");
+                  nas_config(1 + ue_proxy_id, third_octet, fourth_octet, "oaitun_ue");
                   break;
                 }
               }

@@ -300,7 +300,8 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
      * deliver the retrieved SDAP SDU to the upper layer.
      */
     extern int nas_sock_fd[];
-    int len = write(nas_sock_fd[0], &buf[offset], size-offset);
+    extern int ue_tun_fd_idx;
+    int len = write(nas_sock_fd[ue_tun_fd_idx], &buf[offset], size-offset);
     LOG_D(SDAP, "RX Entity len : %d\n", len);
     LOG_D(SDAP, "RX Entity size : %d\n", size);
     LOG_D(SDAP, "RX Entity offset : %d\n", offset);

@@ -47,6 +47,7 @@
 #include "radio/ETHERNET/if_defs.h"
 #include <stdio.h>
 #include "openair2/GNB_APP/MACRLC_nr_paramdef.h"
+#include "openair2/NR_UE_PHY_INTERFACE/emuran_bler.h"
 
 #define MAX_IF_MODULES 100
 
@@ -586,7 +587,12 @@ static void fill_rx_ind(nfapi_nr_pdu_t *pdu_list, fapi_nr_rx_indication_t *rx_in
         pdu += pdu_list->TLVs[j].length;
     }
     bool ack_nack = true;
-    if (mac->ra.ra_state >= RA_SUCCEEDED && should_drop_transport_block(rx_ind->slot, mac->crnti))
+    bool ra_succeeded = mac->ra.ra_state >= RA_SUCCEEDED;
+    if (ra_succeeded && should_drop_transport_block(rx_ind->slot, mac->crnti))
+    {
+      ack_nack = false;
+    }
+    if (ack_nack && emuran_dl_should_nack(rx_ind->sfn, rx_ind->slot, mac->crnti, ra_succeeded))
     {
       ack_nack = false;
     }
@@ -990,7 +996,17 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
                         dl_tti_request->SFN, dl_tti_request->Slot, nr_dl_tti_req_queue.num_items);
 
 
-            if (is_channel_modeling())
+            /* EMURAN: MCS/RNTI capture is cheap bookkeeping (fills slot_rnti_mcs[]),
+             * not a drop decision -- should_drop_transport_block() still gates the
+             * legacy is_channel_modeling() path itself. Previously this whole capture
+             * step required node_number==0, which our real deployment never uses
+             * (always --node-number 2), so slot_rnti_mcs[] stayed empty forever and
+             * emuran_dl_should_nack()'s MCS/RV lookup silently found nothing.
+             * save_pdsch_pdu_for_crnti() aborts on nPDUs<=0 (its pre-existing
+             * precondition, previously unreachable behind the node_number gate) --
+             * a DL_TTI_REQUEST for an idle slot can legitimately carry zero PDUs,
+             * so skip the call rather than crash on those. */
+            if (dl_tti_request->dl_tti_request_body.nPDUs > 0)
                 save_pdsch_pdu_for_crnti(dl_tti_request);
 
             if (!put_queue(&nr_dl_tti_req_queue, dl_tti_request))

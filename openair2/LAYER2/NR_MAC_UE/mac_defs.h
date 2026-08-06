@@ -344,9 +344,19 @@ typedef struct {
   uint32_t TBS;
 } NR_UE_HARQ_STATUS_t;
 
+/* EMURAN: buffer big enough for any TBS this stack can grant
+ * (MAX_ULSCH_PAYLOAD_BYTES = MAX_NUM_DLSCH_SEGMENTS(13) * 768 = 9984). */
+#define EMURAN_UL_HARQ_BUF_BYTES 10240
+
 typedef struct {
   uint32_t R;
   uint32_t TBS;
+  /* EMURAN: last transmitted PDU bytes for this UL HARQ process, so a
+   * retransmission grant (new_data_indicator==0) can resend the same bytes
+   * instead of producing nothing -- see nr_ue_scheduler.c. */
+  uint8_t emuran_pdu_buf[EMURAN_UL_HARQ_BUF_BYTES];
+  uint16_t emuran_pdu_len;
+  bool emuran_pdu_valid;
 } NR_UL_HARQ_INFO_t;
 
 typedef struct {

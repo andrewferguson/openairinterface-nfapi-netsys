@@ -1044,6 +1044,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
             if (ulcfg_pdu->pdu_type == FAPI_NR_UL_CONFIG_TYPE_PUSCH) {
               int mac_pdu_exist = 0;
               uint16_t TBS_bytes = ulcfg_pdu->pusch_config_pdu.pusch_data.tb_size;
+              uint8_t ul_harq_id = ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id;
               LOG_D(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               // printf("[%d.%d] harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",frame_tx, slot_tx,ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               if (ra->ra_state == WAIT_RAR && !ra->cfra) {
@@ -1053,16 +1054,36 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
                   LOG_D(NR_MAC,"(%i): 0x%x\n", k, ulsch_input_buffer[k]);
                 }
                 mac_pdu_exist = 1;
-              } 
+              }
               else {
                 if (ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator && (mac->state == UE_CONNECTED ||(ra->ra_state == WAIT_RAR && ra->cfra))){
                   // Getting IP traffic to be transmitted
                   nr_ue_get_sdu(mod_id, cc_id,frame_tx, slot_tx, gNB_index, ulsch_input_buffer, TBS_bytes);
                   mac_pdu_exist = 1;
                 }
+                /* EMURAN: stock OAI only builds a PDU when new_data_indicator is
+                 * set, so a retransmission grant (ndi==0) produced nothing here --
+                 * no RX_DATA, no CRC, and the gNB's retransmission always timed
+                 * out into abort_nr_ul_harq() instead of getting a real CRC
+                 * decision. Resend the bytes buffered from this HARQ process's
+                 * initial transmission so fapi_nr_ue_l1.c's CRC path actually runs. */
+                else if (!ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator
+                         && ul_harq_id < NR_MAX_HARQ_PROCESSES
+                         && mac->ul_harq_info[ul_harq_id].emuran_pdu_valid
+                         && mac->ul_harq_info[ul_harq_id].emuran_pdu_len == TBS_bytes) {
+                  memcpy(ulsch_input_buffer, mac->ul_harq_info[ul_harq_id].emuran_pdu_buf, TBS_bytes);
+                  mac_pdu_exist = 1;
+                }
               }
               // Config UL TX PDU
               if (mac_pdu_exist) {
+                if (ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator
+                    && ul_harq_id < NR_MAX_HARQ_PROCESSES
+                    && TBS_bytes <= EMURAN_UL_HARQ_BUF_BYTES) {
+                  memcpy(mac->ul_harq_info[ul_harq_id].emuran_pdu_buf, ulsch_input_buffer, TBS_bytes);
+                  mac->ul_harq_info[ul_harq_id].emuran_pdu_len = TBS_bytes;
+                  mac->ul_harq_info[ul_harq_id].emuran_pdu_valid = true;
+                }
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu_length = TBS_bytes;
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu_index = j;
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu = ulsch_input_buffer;
@@ -1101,6 +1122,7 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
             if (ulcfg_pdu->pdu_type == FAPI_NR_UL_CONFIG_TYPE_PUSCH) {
               int mac_pdu_exist = 0;
               uint16_t TBS_bytes = ulcfg_pdu->pusch_config_pdu.pusch_data.tb_size;
+              uint8_t ul_harq_id = ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id;
               LOG_D(NR_MAC,"harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               // printf("[%d.%d] harq_id %d, new_data_indicator %d, TBS_bytes %d (ra_state %d)\n",frame_tx, slot_tx,ulcfg_pdu->pusch_config_pdu.pusch_data.harq_process_id,ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator,TBS_bytes,ra->ra_state);
               if (ra->ra_state == WAIT_RAR && !ra->cfra) {
@@ -1110,16 +1132,36 @@ void nr_ue_ul_scheduler(nr_uplink_indication_t *ul_info)
                   LOG_D(NR_MAC,"(%i): 0x%x\n", k, ulsch_input_buffer[k]);
                 }
                 mac_pdu_exist = 1;
-              } 
+              }
               else {
                 if (ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator && (mac->state == UE_CONNECTED ||(ra->ra_state == WAIT_RAR && ra->cfra))){
                   // Getting IP traffic to be transmitted
                   nr_ue_get_sdu(mod_id, cc_id,frame_tx, slot_tx, gNB_index, ulsch_input_buffer, TBS_bytes);
                   mac_pdu_exist = 1;
                 }
+                /* EMURAN: stock OAI only builds a PDU when new_data_indicator is
+                 * set, so a retransmission grant (ndi==0) produced nothing here --
+                 * no RX_DATA, no CRC, and the gNB's retransmission always timed
+                 * out into abort_nr_ul_harq() instead of getting a real CRC
+                 * decision. Resend the bytes buffered from this HARQ process's
+                 * initial transmission so fapi_nr_ue_l1.c's CRC path actually runs. */
+                else if (!ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator
+                         && ul_harq_id < NR_MAX_HARQ_PROCESSES
+                         && mac->ul_harq_info[ul_harq_id].emuran_pdu_valid
+                         && mac->ul_harq_info[ul_harq_id].emuran_pdu_len == TBS_bytes) {
+                  memcpy(ulsch_input_buffer, mac->ul_harq_info[ul_harq_id].emuran_pdu_buf, TBS_bytes);
+                  mac_pdu_exist = 1;
+                }
               }
               // Config UL TX PDU
               if (mac_pdu_exist) {
+                if (ulcfg_pdu->pusch_config_pdu.pusch_data.new_data_indicator
+                    && ul_harq_id < NR_MAX_HARQ_PROCESSES
+                    && TBS_bytes <= EMURAN_UL_HARQ_BUF_BYTES) {
+                  memcpy(mac->ul_harq_info[ul_harq_id].emuran_pdu_buf, ulsch_input_buffer, TBS_bytes);
+                  mac->ul_harq_info[ul_harq_id].emuran_pdu_len = TBS_bytes;
+                  mac->ul_harq_info[ul_harq_id].emuran_pdu_valid = true;
+                }
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu_length = TBS_bytes;
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu_index = j;
                 tx_req.tx_request_body[tx_req.number_of_pdus].pdu = ulsch_input_buffer;

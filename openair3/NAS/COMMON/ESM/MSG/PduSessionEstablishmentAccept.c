@@ -27,6 +27,16 @@
 
 extern char *baseNetAddress;
 
+/* EMURAN: same per-process UE index that already drives the proxy relay
+ * port formula (see nr-ue.c's init_nrUE_standalone_thread) -- reused so
+ * concurrent native UE processes on one host don't all apply their IP to
+ * the same hardcoded oaitun_ue1. This is the actual PDU Session
+ * Establishment Accept decoder (called from capture_pdu_session_
+ * establishment_accept_msg before nr_nas_msg_sim.c's own byte-scan loop
+ * ever reaches its nas_config call), so this is the real fix -- the other
+ * one is dead code for this message format. */
+extern uint16_t ue_proxy_id;
+
 static uint16_t getShort(uint8_t *input)
 {
   uint16_t tmp16;
@@ -112,7 +122,7 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
           psea_msg.pdu_addr_ie.pdu_addr_oct4 = *curPtr++;
           nas_getparams();
           sprintf(baseNetAddress, "%d.%d", psea_msg.pdu_addr_ie.pdu_addr_oct1, psea_msg.pdu_addr_ie.pdu_addr_oct2);
-          nas_config(1, psea_msg.pdu_addr_ie.pdu_addr_oct3, psea_msg.pdu_addr_ie.pdu_addr_oct4, "oaitun_ue");
+          nas_config(1 + ue_proxy_id, psea_msg.pdu_addr_ie.pdu_addr_oct3, psea_msg.pdu_addr_ie.pdu_addr_oct4, "oaitun_ue");
           LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received UE IP: %d.%d.%d.%d\n",
                 psea_msg.pdu_addr_ie.pdu_addr_oct1,
                 psea_msg.pdu_addr_ie.pdu_addr_oct2,

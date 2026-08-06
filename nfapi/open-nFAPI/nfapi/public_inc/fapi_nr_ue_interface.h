@@ -112,7 +112,16 @@ typedef struct {
   uint16_t SFN;
   uint8_t slot;
   uint16_t number_of_dcis;
-  fapi_nr_dci_indication_pdu_t dci_list[10];
+  /* EMURAN: was dci_list[10] -- in this native standalone-PNF relay setup
+   * the full per-slot PDCCH PDU (which can carry a grant for every
+   * concurrently-scheduled UE in the cell) is relayed identically to
+   * each UE process, and the RNTI filter that keeps only this UE's own
+   * DCIs runs AFTER num_dci is checked against this array's size (see
+   * copy_ul_dci_data_req_to_dl_info() in NR_IF_Module.c). With 10 UEs
+   * each granted in the same slot, num_dci hit exactly 10 and tripped
+   * the "num_dci < 10" assertion. Sized well above any fleet size this
+   * testbed exercises. */
+  fapi_nr_dci_indication_pdu_t dci_list[64];
 } fapi_nr_dci_indication_t;
 
 

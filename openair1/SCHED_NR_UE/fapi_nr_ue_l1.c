@@ -41,6 +41,7 @@
 #include "utils.h"
 #include "openair2/PHY_INTERFACE/queue_t.h"
 #include "SCHED_NR_UE/phy_sch_processing_time.h"
+#include "openair2/NR_UE_PHY_INTERFACE/emuran_bler.h"
 
 extern PHY_VARS_NR_UE ***PHY_vars_UE_g;
 
@@ -188,7 +189,12 @@ int8_t nr_ue_scheduled_response_stub(nr_scheduled_response_t *scheduled_response
                       scheduled_response->frame, scheduled_response->slot, crc_ind->sfn, crc_ind->slot);
                 crc_ind->crc_list[j].num_cb = pusch_config_pdu->pusch_data.num_cb;
                 crc_ind->crc_list[j].rnti = pusch_config_pdu->rnti;
-                crc_ind->crc_list[j].tb_crc_status = 0;
+                bool ul_ra_succeeded = mac->ra.ra_state >= RA_SUCCEEDED;
+                bool ul_fail = emuran_ul_should_fail(crc_ind->sfn, crc_ind->slot, pusch_config_pdu->rnti,
+                                                      pusch_config_pdu->pusch_data.harq_process_id,
+                                                      pusch_config_pdu->pusch_data.rv_index,
+                                                      pusch_config_pdu->mcs_index, ul_ra_succeeded);
+                crc_ind->crc_list[j].tb_crc_status = ul_fail ? 1 : 0;
                 crc_ind->crc_list[j].timing_advance = 31;
                 crc_ind->crc_list[j].ul_cqi = 255;
                 // if(mac->nr_ue_emul_l1.harq[crc_ind->crc_list[j].harq_id].active_ul_harq_sfn == -1 &&
