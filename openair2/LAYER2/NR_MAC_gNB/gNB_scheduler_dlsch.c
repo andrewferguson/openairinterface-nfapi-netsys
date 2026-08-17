@@ -29,6 +29,7 @@
 
  */
 
+#include <time.h>
 #include "common/utils/nr/nr_common.h"
 /*MAC*/
 #include "NR_MAC_COMMON/nr_mac.h"
@@ -1028,12 +1029,118 @@ nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id) {
   return nr_fr1_dlsch_preprocessor;
 }
 
+/* EMURAN: periodic (150ms wall-clock) PER-UE DL RB allocation logging,
+ * mirrors the UL version in gNB_scheduler_ulsch.c (see there for the
+ * rationale) but for PDSCH grants, keyed by RNTI in a small fixed table,
+ * reset every window. */
+#define EMURAN_DL_RB_MAX_UES 32
+static struct { uint16_t rnti; uint32_t rb; } emuran_dl_rb_per_ue[EMURAN_DL_RB_MAX_UES];
+static int emuran_dl_rb_per_ue_count = 0;
+static struct timespec emuran_dl_rb_window_start = {0, 0};
+static double emuran_dl_rb_elapsed_total_ms = 0.0;
+
+static void emuran_dl_rb_add(uint16_t rnti, uint32_t rb)
+{
+  for (int i = 0; i < emuran_dl_rb_per_ue_count; i++) {
+    if (emuran_dl_rb_per_ue[i].rnti == rnti) {
+      emuran_dl_rb_per_ue[i].rb += rb;
+      return;
+    }
+  }
+  if (emuran_dl_rb_per_ue_count < EMURAN_DL_RB_MAX_UES) {
+    emuran_dl_rb_per_ue[emuran_dl_rb_per_ue_count].rnti = rnti;
+    emuran_dl_rb_per_ue[emuran_dl_rb_per_ue_count].rb = rb;
+    emuran_dl_rb_per_ue_count++;
+  }
+}
+
+static void emuran_dl_rb_flush_if_due(void)
+{
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (emuran_dl_rb_window_start.tv_sec == 0 && emuran_dl_rb_window_start.tv_nsec == 0) {
+    emuran_dl_rb_window_start = now;
+    return;
+  }
+  double elapsed_ms = (now.tv_sec - emuran_dl_rb_window_start.tv_sec) * 1000.0
+                     + (now.tv_nsec - emuran_dl_rb_window_start.tv_nsec) / 1e6;
+  if (elapsed_ms >= 150.0) {
+    emuran_dl_rb_elapsed_total_ms += elapsed_ms;
+    double t = emuran_dl_rb_elapsed_total_ms / 1000.0;
+    for (int i = 0; i < emuran_dl_rb_per_ue_count; i++) {
+      fprintf(stderr, "EMURAN-DL-RB-CSV t=%.3f rnti=%04x dl_rb=%u\n",
+              t, emuran_dl_rb_per_ue[i].rnti, emuran_dl_rb_per_ue[i].rb);
+    }
+    fflush(stderr);
+    emuran_dl_rb_per_ue_count = 0;
+    emuran_dl_rb_window_start = now;
+  }
+}
+
+/* EMURAN: periodic (150ms) PER-UE DL HARQ round-histogram logging.
+ * OAI already tracks UE->mac_stats.dl.rounds[round] cumulatively; this just
+ * mirrors that counter into a fixed table so it can be flushed alongside
+ * the RB-CSV lines, letting an external script compute a retransmission
+ * rate (sum(rounds[1:]) / sum(rounds[0:])) per UE without needing
+ * mac_log_level=info (whose per-slot LOG_I volume would drown out the
+ * limited container log retention across 10 concurrent cells). */
+#define EMURAN_HARQ_MAX_UES 32
+#define EMURAN_HARQ_MAX_ROUNDS 4
+static struct { uint16_t rnti; uint32_t rounds[EMURAN_HARQ_MAX_ROUNDS]; } emuran_harq_per_ue[EMURAN_HARQ_MAX_UES];
+static int emuran_harq_per_ue_count = 0;
+static struct timespec emuran_harq_window_start = {0, 0};
+static double emuran_harq_elapsed_total_ms = 0.0;
+
+static void emuran_harq_add(uint16_t rnti, uint8_t round)
+{
+  if (round >= EMURAN_HARQ_MAX_ROUNDS)
+    round = EMURAN_HARQ_MAX_ROUNDS - 1;
+  for (int i = 0; i < emuran_harq_per_ue_count; i++) {
+    if (emuran_harq_per_ue[i].rnti == rnti) {
+      emuran_harq_per_ue[i].rounds[round]++;
+      return;
+    }
+  }
+  if (emuran_harq_per_ue_count < EMURAN_HARQ_MAX_UES) {
+    emuran_harq_per_ue[emuran_harq_per_ue_count].rnti = rnti;
+    memset(emuran_harq_per_ue[emuran_harq_per_ue_count].rounds, 0, sizeof(emuran_harq_per_ue[0].rounds));
+    emuran_harq_per_ue[emuran_harq_per_ue_count].rounds[round] = 1;
+    emuran_harq_per_ue_count++;
+  }
+}
+
+static void emuran_harq_flush_if_due(void)
+{
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (emuran_harq_window_start.tv_sec == 0 && emuran_harq_window_start.tv_nsec == 0) {
+    emuran_harq_window_start = now;
+    return;
+  }
+  double elapsed_ms = (now.tv_sec - emuran_harq_window_start.tv_sec) * 1000.0
+                     + (now.tv_nsec - emuran_harq_window_start.tv_nsec) / 1e6;
+  if (elapsed_ms >= 150.0) {
+    emuran_harq_elapsed_total_ms += elapsed_ms;
+    double t = emuran_harq_elapsed_total_ms / 1000.0;
+    for (int i = 0; i < emuran_harq_per_ue_count; i++) {
+      fprintf(stderr, "EMURAN-HARQ-CSV t=%.3f rnti=%04x r0=%u r1=%u r2=%u r3=%u\n",
+              t, emuran_harq_per_ue[i].rnti, emuran_harq_per_ue[i].rounds[0],
+              emuran_harq_per_ue[i].rounds[1], emuran_harq_per_ue[i].rounds[2], emuran_harq_per_ue[i].rounds[3]);
+    }
+    fflush(stderr);
+    emuran_harq_per_ue_count = 0;
+    emuran_harq_window_start = now;
+  }
+}
+
 void nr_schedule_ue_spec(module_id_t module_id,
                          frame_t frame,
                          sub_frame_t slot,
                          nfapi_nr_dl_tti_request_t *DL_req,
                          nfapi_nr_tx_data_request_t *TX_req)
 {
+  emuran_dl_rb_flush_if_due();
+  emuran_harq_flush_if_due();
   gNB_MAC_INST *gNB_mac = RC.nrmac[module_id];
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   AssertFatal(pthread_mutex_trylock(&gNB_mac->sched_lock) == EBUSY,
@@ -1073,6 +1180,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     else{
       // printf("[%d.%d]gNB dlsch scheduler sched_pdsch->rbSize %d  \n", frame, slot,sched_pdsch->rbSize );
     }
+    emuran_dl_rb_add(UE->rnti, sched_pdsch->rbSize);
     const rnti_t rnti = UE->rnti;
 
     /* POST processing */
@@ -1110,6 +1218,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     harq->feedback_slot = pucch->ul_slot;
     harq->is_waiting = true;
     UE->mac_stats.dl.rounds[harq->round]++;
+    emuran_harq_add(UE->rnti, harq->round);
     LOG_I(NR_MAC,
           "%4d.%2d [DLSCH/PDSCH/PUCCH] RNTI %04x DCI L %d start %3d RBs %3d startSymbol %2d nb_symbol %2d dmrspos %x MCS %2d nrOfLayers %d TBS %4d HARQ PID %2d round %d RV %d NDI %d dl_data_to_ULACK %d (%d.%d) PUCCH allocation %d TPC %d\n",
           frame,

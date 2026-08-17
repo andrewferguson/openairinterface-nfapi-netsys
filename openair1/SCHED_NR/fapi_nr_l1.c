@@ -251,6 +251,18 @@ void nr_schedule_response(NR_Sched_Rsp_t *Sched_INFO)
     }
   }
 
+  {
+    static long emuran_diag_count = 0;
+    if (number_dl_pdu > 0 && emuran_diag_count < 200) {
+      emuran_diag_count++;
+      fprintf(stderr, "EMURAN-DIAG-GNB frame=%d slot=%d NFAPI_MODE=%d number_dl_pdu=%d rnti0=%04x pdutype0=%d\n",
+              frame, slot, NFAPI_MODE, number_dl_pdu,
+              DL_req ? DL_req->dl_tti_request_body.dl_tti_pdu_list[0].pdsch_pdu.pdsch_pdu_rel15.rnti : 0,
+              DL_req ? DL_req->dl_tti_request_body.dl_tti_pdu_list[0].PDUType : -1);
+      fflush(stderr);
+    }
+  }
+
   if (NFAPI_MODE == NFAPI_MODE_VNF) { //If VNF, oai_nfapi functions send respective p7 msgs to PNF for which nPDUs is greater than 0
 
     if(number_ul_tti_pdu>0)
@@ -262,8 +274,15 @@ void nr_schedule_response(NR_Sched_Rsp_t *Sched_INFO)
     if (number_tx_data_pdu>0)
       oai_nfapi_tx_data_req(TX_req);
 
-    if (number_dl_pdu>0)
+    if (number_dl_pdu>0) {
+      static long emuran_diag_sent = 0;
+      if (emuran_diag_sent < 200) {
+        emuran_diag_sent++;
+        fprintf(stderr, "EMURAN-DIAG-GNB-SEND frame=%d slot=%d calling oai_nfapi_dl_tti_req nPDUs=%d\n", frame, slot, number_dl_pdu);
+        fflush(stderr);
+      }
       oai_nfapi_dl_tti_req(DL_req);
+    }
   }
   // send subframe indication to PNF
     LOG_D(PHY,"NFAPI: Sending slot indication to PNF \n");
