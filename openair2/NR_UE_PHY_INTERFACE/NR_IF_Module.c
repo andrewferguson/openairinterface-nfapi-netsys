@@ -980,6 +980,14 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 {
      static int once = 0;
     NR_UE_MAC_INST_t *mac = get_mac_inst(0);
+    {
+      static long emuran_diag_count = 0;
+      if (emuran_diag_count < 300) {
+        emuran_diag_count++;
+        fprintf(stderr, "EMURAN-DIAG-UE-RECV message_id=0x%02x len=%zd\n", header.message_id, len);
+        fflush(stderr);
+      }
+    }
     switch (header.message_id)
     {
         case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
