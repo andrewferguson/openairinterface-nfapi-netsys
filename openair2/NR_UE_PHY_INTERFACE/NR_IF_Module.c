@@ -733,6 +733,8 @@ static bool send_crc_ind_and_rx_ind(int sfn_slot)
       .rx_ind = *rx_ind,
     };
     send_nsa_standalone_msg(&UL_INFO, rx_ind->header.message_id);
+    for (int i = 0; i < rx_ind->number_of_pdus; i++)
+      free(rx_ind->pdu_list[i].pdu);
     free(rx_ind->pdu_list);
     free(rx_ind);
 
