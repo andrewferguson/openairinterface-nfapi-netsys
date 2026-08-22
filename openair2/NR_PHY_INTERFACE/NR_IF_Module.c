@@ -268,6 +268,10 @@ static void free_unqueued_nfapi_indications(nfapi_nr_rach_indication_t *rach_ind
   }
   if (rx_ind && rx_ind->number_of_pdus > 0)
   {
+    for (int i = 0; i < rx_ind->number_of_pdus; i++)
+    {
+      free_and_zero(rx_ind->pdu_list[i].pdu);
+    }
     free_and_zero(rx_ind->pdu_list);
     free_and_zero(rx_ind);
   }
@@ -458,7 +462,10 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
                gnb_rx_ind_queue.num_items, gnb_crc_ind_queue.num_items);
         fflush(stdout);
         LOG_I(NR_PHY, "No crc indication with the same SFN SLOT of rx indication %u %u\n", rx_ind->sfn, rx_ind->slot);
-        requeue(&gnb_rx_ind_queue, rx_ind);
+        if (requeue(&gnb_rx_ind_queue, rx_ind))
+          rx_ind = NULL;
+        else
+          LOG_E(NR_PHY, "Failed to requeue unmatched rx indication.\n");
       }
       else {
         AssertFatal(rx_ind->number_of_pdus > 0, "Invalid number of PDUs\n");
@@ -510,7 +517,7 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
   handle_nr_srs(UL_info);
 
   if (get_softmodem_params()->emulate_l1) {
-    //free_unqueued_nfapi_indications(rach_ind, uci_ind, rx_ind, crc_ind);
+    free_unqueued_nfapi_indications(rach_ind, uci_ind, rx_ind, crc_ind);
   }
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
     gNB_MAC_INST     *mac        = RC.nrmac[module_id];
