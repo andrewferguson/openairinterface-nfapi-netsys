@@ -4502,7 +4502,8 @@ void fill_coresetZero(NR_ControlResourceSet_t *coreset0, NR_Type0_PDCCH_CSS_conf
 
   coreset0->duration = duration;
   coreset0->cce_REG_MappingType.present=NR_ControlResourceSet__cce_REG_MappingType_PR_interleaved;
-  coreset0->cce_REG_MappingType.choice.interleaved=calloc(1,sizeof(*coreset0->cce_REG_MappingType.choice.interleaved));
+  if (coreset0->cce_REG_MappingType.choice.interleaved == NULL)
+    coreset0->cce_REG_MappingType.choice.interleaved=calloc(1,sizeof(*coreset0->cce_REG_MappingType.choice.interleaved));
   coreset0->cce_REG_MappingType.choice.interleaved->reg_BundleSize = NR_ControlResourceSet__cce_REG_MappingType__interleaved__reg_BundleSize_n6;
   coreset0->cce_REG_MappingType.choice.interleaved->interleaverSize = NR_ControlResourceSet__cce_REG_MappingType__interleaved__interleaverSize_n2;
   coreset0->cce_REG_MappingType.choice.interleaved->shiftIndex = NULL; // -> use cell_id
@@ -4539,13 +4540,16 @@ void fill_searchSpaceZero(NR_SearchSpace_t *ss0,
 
   ss0->searchSpaceId = 0;
   *ss0->controlResourceSetId = 0;
-  ss0->monitoringSlotPeriodicityAndOffset = calloc(1,sizeof(*ss0->monitoringSlotPeriodicityAndOffset));
+  if (ss0->monitoringSlotPeriodicityAndOffset == NULL)
+    ss0->monitoringSlotPeriodicityAndOffset = calloc(1,sizeof(*ss0->monitoringSlotPeriodicityAndOffset));
   set_monitoring_periodicity_offset(ss0,periodicity,offset);
   const uint32_t duration = type0_PDCCH_CSS_config->search_space_duration;
-  if (duration==1)
+  if (duration==1) {
+    free(ss0->duration);
     ss0->duration = NULL;
-  else{
-    ss0->duration = calloc(1,sizeof(*ss0->duration));
+  } else {
+    if (ss0->duration == NULL)
+      ss0->duration = calloc(1,sizeof(*ss0->duration));
     *ss0->duration = duration;
   }
 
