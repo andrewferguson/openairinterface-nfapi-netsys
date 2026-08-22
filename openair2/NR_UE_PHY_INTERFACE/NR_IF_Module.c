@@ -1475,6 +1475,11 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
         nr_ue_if_module_inst[module_id]->scheduled_response(&scheduled_response);
         memset(def_dci_pdu_rel15, 0, sizeof(*def_dci_pdu_rel15));
       }
+      free(dl_info->dci_ind);
+      dl_info->dci_ind = NULL;
+    }
+    else if (dl_info && dl_info->dci_ind) {
+      free(dl_info->dci_ind);
       dl_info->dci_ind = NULL;
     }
 
@@ -1531,7 +1536,12 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
           default:
             break;
         }
+        if (rx_indication_body.pdu_type == FAPI_NR_RX_PDU_TYPE_SIB ||
+            rx_indication_body.pdu_type == FAPI_NR_RX_PDU_TYPE_DLSCH ||
+            rx_indication_body.pdu_type == FAPI_NR_RX_PDU_TYPE_RAR)
+          free(dl_info->rx_ind->rx_indication_body[i].pdsch_pdu.pdu);
       }
+      free(dl_info->rx_ind);
       dl_info->rx_ind = NULL;
     }
   }
