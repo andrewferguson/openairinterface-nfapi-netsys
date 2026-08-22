@@ -820,6 +820,7 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id,
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   AssertFatal(mib, "MIB should not be NULL\n");
   // initialize dl and ul config_request upon first reception of MIB
+  ASN_STRUCT_FREE(asn_DEF_NR_MIB, mac->mib);
   mac->mib = mib;    //  update by every reception
   mac->phy_config.Mod_id = module_id;
   mac->phy_config.CC_id = cc_idP;
