@@ -93,6 +93,8 @@ static void free_uci_inds(nfapi_nr_uci_indication_t *uci_ind)
             pdu_2_3_4->sr.sr_payload = NULL;
             free(pdu_2_3_4->harq.harq_payload);
             pdu_2_3_4->harq.harq_payload = NULL;
+            free(pdu_2_3_4->csi_part1.csi_part1_payload);
+            pdu_2_3_4->csi_part1.csi_part1_payload = NULL;
         }
     }
     free(uci_ind->uci_list);
